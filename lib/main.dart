@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -422,6 +422,8 @@ class NotificationService {
   final _plugin = FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
+    if (kIsWeb) return;
+
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
     await _plugin.initialize(
@@ -440,6 +442,8 @@ class NotificationService {
   }
 
   Future<void> schedule(Note note) async {
+    if (kIsWeb) return;
+
     await cancel(note.id);
     final reminder = note.reminderAt;
     if (reminder == null || reminder.isBefore(DateTime.now())) return;
@@ -469,10 +473,17 @@ class NotificationService {
     await _tryNativeAlarm(note);
   }
 
-  Future<void> cancel(String noteId) => _plugin.cancel(id: _intId(noteId));
+  Future<void> cancel(String noteId) {
+    if (kIsWeb) return Future<void>.value();
+    return _plugin.cancel(id: _intId(noteId));
+  }
 
   Future<void> _tryNativeAlarm(Note note) async {
-    if (!Platform.isAndroid || note.reminderAt == null) return;
+    if (kIsWeb ||
+        defaultTargetPlatform != TargetPlatform.android ||
+        note.reminderAt == null) {
+      return;
+    }
     final time = note.reminderAt!;
     final intent = AndroidIntent(
       action: 'android.intent.action.SET_ALARM',
@@ -866,6 +877,10 @@ class NoteCard extends StatelessWidget {
     return Dismissible(
       key: ValueKey(note.id),
       direction: DismissDirection.horizontal,
+      dismissThresholds: const {
+        DismissDirection.startToEnd: 0.2,
+        DismissDirection.endToStart: 0.2,
+      },
       confirmDismiss: (_) => _confirmDelete(context),
       onDismissed: (_) => store.deleteNote(note.id),
       background: const DismissBg(alignment: Alignment.centerLeft),
@@ -885,12 +900,23 @@ class NoteCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Checkbox(
-                value: note.done,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(7),
+              Semantics(
+                button: true,
+                selected: note.done,
+                label: note.done ? '标记为未完成' : '标记为已完成',
+                child: IconButton.filledTonal(
+                  tooltip: note.done ? '标记为未完成' : '标记为已完成',
+                  onPressed: () => store.toggleDone(note.id),
+                  icon: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(
+                      note.done
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      key: ValueKey(note.done),
+                    ),
+                  ),
                 ),
-                onChanged: (_) => store.toggleDone(note.id),
               ),
               const SizedBox(width: 8),
               Expanded(
