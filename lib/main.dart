@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
@@ -187,21 +189,21 @@ class AiPreset {
 
 const aiPresets = [
   AiPreset(
-    '开放智能',
+    'OpenAI',
     'https://api.openai.com/v1',
     'gpt-4o',
     'https://platform.openai.com/api-keys',
     '创建接口密钥后保持默认接口地址即可。',
   ),
   AiPreset(
-    '安索智能',
+    'Anthropic',
     'https://api.anthropic.com/v1',
     'claude-3-5-sonnet-latest',
     'https://console.anthropic.com/settings/keys',
     'Anthropic 接口格式不同，建议正式版通过后端适配。',
   ),
   AiPreset(
-    '谷歌双子',
+    'Google Gemini',
     'https://generativelanguage.googleapis.com/v1beta',
     'gemini-1.5-pro',
     'https://aistudio.google.com/app/apikey',
@@ -212,17 +214,17 @@ const aiPresets = [
     'https://api.deepseek.com/v1',
     'deepseek-chat',
     'https://platform.deepseek.com/api_keys',
-    '兼容开放智能聊天补全接口。',
+    '兼容 OpenAI 聊天补全接口。',
   ),
   AiPreset(
     'Moonshot',
     'https://api.moonshot.cn/v1',
     'moonshot-v1-8k',
     'https://platform.moonshot.cn/console/api-keys',
-    '兼容开放智能调用格式。',
+    '兼容 OpenAI 调用格式。',
   ),
   AiPreset(
-    '智谱智能',
+    '智谱AI',
     'https://open.bigmodel.cn/api/paas/v4',
     'glm-4-plus',
     'https://open.bigmodel.cn/usercenter/apikeys',
@@ -233,13 +235,23 @@ const aiPresets = [
     'https://dashscope.aliyuncs.com/compatible-mode/v1',
     'qwen-plus',
     'https://dashscope.console.aliyun.com/apiKey',
-    '使用通义兼容模式可按开放智能风格请求。',
+    '使用通义兼容模式可按 OpenAI 风格请求。',
   ),
 ];
 
+String normalizeProviderName(String value) {
+  return switch (value) {
+    '开放智能' => 'OpenAI',
+    '安索智能' => 'Anthropic',
+    '谷歌双子' => 'Google Gemini',
+    '智谱智能' => '智谱AI',
+    _ => value,
+  };
+}
+
 class AiConfig {
   const AiConfig({
-    this.provider = '开放智能',
+    this.provider = 'OpenAI',
     this.apiKey = '',
     this.baseUrl = 'https://api.openai.com/v1',
     this.model = 'gpt-4o',
@@ -258,7 +270,7 @@ class AiConfig {
   };
 
   factory AiConfig.fromJson(Map<String, dynamic> json) => AiConfig(
-    provider: json['provider'] as String? ?? '开放智能',
+    provider: normalizeProviderName(json['provider'] as String? ?? 'OpenAI'),
     apiKey: json['apiKey'] as String? ?? '',
     baseUrl: json['baseUrl'] as String? ?? 'https://api.openai.com/v1',
     model: json['model'] as String? ?? 'gpt-4o',
@@ -279,6 +291,12 @@ class GeneratedTask {
   final TaskPriority priority;
 }
 
+DateTime _plannedAt(Note note) => note.reminderAt ?? note.createdAt;
+
+DateTime _dateOnly(DateTime value) {
+  return DateTime(value.year, value.month, value.day);
+}
+
 class AppStore extends ChangeNotifier {
   AppStore(this._notifications);
 
@@ -288,6 +306,7 @@ class AppStore extends ChangeNotifier {
   final NotificationService _notifications;
   final List<Note> _notes = [];
   AiConfig _config = const AiConfig();
+  DateTime _archiveDate = DateTime.now();
 
   List<Note> get notes => List.unmodifiable(
     [..._notes]..sort((a, b) {
@@ -299,8 +318,57 @@ class AppStore extends ChangeNotifier {
   );
 
   AiConfig get config => _config;
+  DateTime get archiveDate => _archiveDate;
   int get doneCount => _notes.where((note) => note.done).length;
   int get pendingCount => _notes.length - doneCount;
+  int get totalCount => _notes.length;
+  int get highPriorityDoneCount => _notes
+      .where((note) => note.done && note.priority == TaskPriority.high)
+      .length;
+  double get completionRate => totalCount == 0 ? 0 : doneCount / totalCount;
+
+  List<DateTime> get archiveDates {
+    final dates = <DateTime>{};
+    for (final note in _notes) {
+      dates.add(_dateOnly(_plannedAt(note)));
+    }
+    return dates.toList()..sort((a, b) => b.compareTo(a));
+  }
+
+  List<Note> get notesOnArchiveDate {
+    final selected = _dateOnly(_archiveDate);
+    return notes
+        .where((note) => _dateOnly(_plannedAt(note)).isAtSameMomentAs(selected))
+        .toList();
+  }
+
+  List<Note> get notesBeforeArchiveDate {
+    final selected = _dateOnly(_archiveDate);
+    return notes
+        .where((note) => _dateOnly(_plannedAt(note)).isBefore(selected))
+        .toList();
+  }
+
+  int get activeDays => archiveDates.length;
+
+  int get currentStreak {
+    final doneDays = _notes
+        .where((note) => note.done)
+        .map((note) => _dateOnly(_plannedAt(note)))
+        .toSet();
+    var cursor = _dateOnly(DateTime.now());
+    var streak = 0;
+    while (doneDays.contains(cursor)) {
+      streak++;
+      cursor = cursor.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
+  void setArchiveDate(DateTime date) {
+    _archiveDate = _dateOnly(date);
+    notifyListeners();
+  }
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -657,8 +725,14 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [NotesPage(), AiPage(), ProfilePage()];
-    final titles = ['今日便签', '智能生成', '我的'];
+    final pages = const [
+      NotesPage(),
+      ArchivePage(),
+      AchievementPage(),
+      AiPage(),
+      ProfilePage(),
+    ];
+    final titles = ['今日便签', '归档', '成就', '智能生成', '我的'];
     return Scaffold(
       extendBody: true,
       appBar: AppBar(
@@ -672,7 +746,7 @@ class _AppShellState extends State<AppShell> {
             child: IconButton.filledTonal(
               tooltip: '设置',
               icon: const Icon(Icons.tune_rounded),
-              onPressed: () => setState(() => _index = 2),
+              onPressed: () => setState(() => _index = 4),
             ),
           ),
         ],
@@ -712,6 +786,14 @@ class _AppShellState extends State<AppShell> {
                 NavigationDestination(
                   icon: Icon(Icons.checklist_rounded),
                   label: '便签',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.event_note_rounded),
+                  label: '归档',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.emoji_events_rounded),
+                  label: '成就',
                 ),
                 NavigationDestination(
                   icon: Icon(Icons.auto_awesome_rounded),
@@ -1025,6 +1107,317 @@ class DismissBg extends StatelessWidget {
   }
 }
 
+class ArchivePage extends StatelessWidget {
+  const ArchivePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<AppStore>();
+    final selected = store.archiveDate;
+    final onDay = store.notesOnArchiveDate;
+    final beforeDay = store.notesBeforeArchiveDate;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 104, 18, 118),
+      children: [
+        GlassPanel(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F6DF6).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Icon(
+                      Icons.event_note_rounded,
+                      color: Color(0xFF2F6DF6),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '归档日期',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '查看某一天，以及这天以前留下的计划。',
+                          style: TextStyle(
+                            color: const Color(
+                              0xFF667085,
+                            ).withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () => _pickArchiveDate(context, selected),
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  label: Text(
+                    DateFormat('yyyy年M月d日 EEEE', 'zh_CN').format(selected),
+                  ),
+                ),
+              ),
+              if (store.archiveDates.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final date in store.archiveDates.take(12))
+                      ChoiceChip(
+                        label: Text(DateFormat('M月d日').format(date)),
+                        selected: _dateOnly(
+                          date,
+                        ).isAtSameMomentAs(_dateOnly(selected)),
+                        onSelected: (_) => store.setArchiveDate(date),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        ArchiveSection(title: '这一天的计划', notes: onDay),
+        const SizedBox(height: 18),
+        ArchiveSection(title: '这天以前的计划', notes: beforeDay),
+      ],
+    );
+  }
+
+  Future<void> _pickArchiveDate(BuildContext context, DateTime selected) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selected,
+      firstDate: DateTime(now.year - 5),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null && context.mounted) {
+      context.read<AppStore>().setArchiveDate(picked);
+    }
+  }
+}
+
+class ArchiveSection extends StatelessWidget {
+  const ArchiveSection({super.key, required this.title, required this.notes});
+
+  final String title;
+  final List<Note> notes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            '$title · ${notes.length}',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+          ),
+        ),
+        const SizedBox(height: 10),
+        if (notes.isEmpty)
+          GlassPanel(
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              '这里暂时没有计划。',
+              style: TextStyle(
+                color: const Color(0xFF667085).withValues(alpha: 0.9),
+              ),
+            ),
+          )
+        else
+          for (final note in notes)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: NoteCard(note: note),
+            ),
+      ],
+    );
+  }
+}
+
+class AchievementPage extends StatelessWidget {
+  const AchievementPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<AppStore>();
+    final rate = store.completionRate;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 104, 18, 118),
+      children: [
+        GlassPanel(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFC857).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.emoji_events_rounded,
+                      color: Color(0xFFC28100),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Text(
+                      '完成不是清空列表，而是在给自己留下证据。',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: rate,
+                  minHeight: 10,
+                  backgroundColor: const Color(0xFFE6ECF7),
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFFFFC857)),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '完成率 ${(rate * 100).round()}%',
+                style: const TextStyle(color: Color(0xFF667085)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        GridView.count(
+          crossAxisCount: MediaQuery.sizeOf(context).width > 700 ? 4 : 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: 1.18,
+          children: [
+            AchievementMetric(
+              icon: Icons.done_all_rounded,
+              label: '完成总数',
+              value: '${store.doneCount}',
+              color: const Color(0xFF54A58A),
+            ),
+            AchievementMetric(
+              icon: Icons.local_fire_department_rounded,
+              label: '连续天数',
+              value: '${store.currentStreak}',
+              color: const Color(0xFFE86C52),
+            ),
+            AchievementMetric(
+              icon: Icons.calendar_month_rounded,
+              label: '活跃日期',
+              value: '${store.activeDays}',
+              color: const Color(0xFF2F6DF6),
+            ),
+            AchievementMetric(
+              icon: Icons.flag_rounded,
+              label: '高优完成',
+              value: '${store.highPriorityDoneCount}',
+              color: const Color(0xFF8A63D2),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        GlassPanel(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '今日鼓励',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                store.doneCount == 0
+                    ? '先完成一件很小的事，让今天开始有重量。'
+                    : '你已经完成 ${store.doneCount} 件事，它们不是消失了，而是变成了你的轨迹。',
+                style: const TextStyle(color: Color(0xFF667085), height: 1.6),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AchievementMetric extends StatelessWidget {
+  const AchievementMetric({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: color, size: 28),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(label, style: const TextStyle(color: Color(0xFF667085))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AiPage extends StatefulWidget {
   const AiPage({super.key});
 
@@ -1233,7 +1626,10 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     final config = context.read<AppStore>().config;
-    _provider = config.provider;
+    final provider = normalizeProviderName(config.provider);
+    _provider = aiPresets.any((item) => item.name == provider)
+        ? provider
+        : aiPresets.first.name;
     _key = TextEditingController(text: config.apiKey);
     _baseUrl = TextEditingController(text: config.baseUrl);
     _model = TextEditingController(text: config.model);
@@ -1269,6 +1665,8 @@ class _ProfilePageState extends State<ProfilePage> {
               DropdownButtonFormField<String>(
                 initialValue: _provider,
                 decoration: const InputDecoration(labelText: '服务商'),
+                isExpanded: true,
+                menuMaxHeight: 360,
                 items: aiPresets
                     .map(
                       (item) => DropdownMenuItem(
@@ -1380,7 +1778,7 @@ class _ProfilePageState extends State<ProfilePage> {
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 14),
-            TutorialLine(icon: Icons.public_rounded, text: preset.homepage),
+            TutorialLinkRow(url: preset.homepage),
             const TutorialLine(
               icon: Icons.key_rounded,
               text: '创建接口密钥后粘贴到上方输入框。',
@@ -1392,6 +1790,66 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
     );
+  }
+}
+
+class TutorialLinkRow extends StatelessWidget {
+  const TutorialLinkRow({super.key, required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.public_rounded, size: 18, color: Color(0xFF2F6DF6)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => _openUrl(context),
+              child: Text(
+                url,
+                style: const TextStyle(
+                  color: Color(0xFF2F6DF6),
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: '复制链接',
+            onPressed: () => _copyUrl(context),
+            icon: const Icon(Icons.copy_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openUrl(BuildContext context) async {
+    final uri = Uri.parse(url);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened && context.mounted) {
+      await _copyUrl(context);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('无法打开浏览器，已复制链接')));
+      }
+    }
+  }
+
+  Future<void> _copyUrl(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('链接已复制')));
+    }
   }
 }
 
