@@ -64,7 +64,7 @@ class _AiPageState extends ConsumerState<AiPage> {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
           children: [
             StickyAppBar(
-              title: 'AI 智能',
+              title: 'AI 便签',
               showSearch: false,
               trailing: IconButton(
                 tooltip: '服务商设置',
@@ -839,14 +839,13 @@ class _HeroPanel extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 66,
-            height: 66,
-            decoration: const BoxDecoration(
-              color: AppColors.notePurple,
-              shape: BoxShape.circle,
+          ClipOval(
+            child: Image.asset(
+              'assets/icon/ai_bot.png',
+              width: 66,
+              height: 66,
+              fit: BoxFit.cover,
             ),
-            child: const Icon(Icons.smart_toy_rounded, size: 36),
           ),
           const SizedBox(width: 14),
           Expanded(

@@ -20,38 +20,45 @@ class StickyAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: showBack ? '返回' : '菜单',
-            onPressed: showBack
-                ? () => Navigator.of(context).maybePop()
-                : () => context.push('/profile'),
-            icon: Icon(
-              showBack ? Icons.chevron_left_rounded : Icons.menu_rounded,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: SizedBox(
+        height: 48,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                tooltip: '',
+                onPressed: showBack
+                    ? () => Navigator.of(context).maybePop()
+                    : () => context.push('/profile'),
+                icon: Icon(
+                  showBack ? Icons.chevron_left_rounded : Icons.menu_rounded,
+                ),
+              ),
             ),
-          ),
-          const Spacer(),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: AppColors.textPrimary,
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const Spacer(),
-          if (showSearch)
-            IconButton(
-              tooltip: '搜索',
-              onPressed: () => context.push('/notes'),
-              icon: const Icon(Icons.search_rounded),
-            )
-          else if (trailing == null)
-            const SizedBox(width: 48),
-          ?trailing,
-        ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: showSearch
+                  ? IconButton(
+                      tooltip: '',
+                      onPressed: () => context.push('/notes'),
+                      icon: const Icon(Icons.search_rounded),
+                    )
+                  : trailing ?? const SizedBox(width: 48, height: 48),
+            ),
+          ],
+        ),
       ),
     );
   }

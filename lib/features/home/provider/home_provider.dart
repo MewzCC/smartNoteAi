@@ -8,6 +8,7 @@ import '../../../data/models/user_config_model.dart';
 import '../../../data/repositories/ai_repository.dart';
 import '../../../data/repositories/note_repository.dart';
 import '../../../data/repositories/user_repository.dart';
+import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
 
 class SmartNoteState {
@@ -113,16 +114,22 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     required String content,
     DateTime? reminderAt,
     NotePriority priority = NotePriority.medium,
+    NoteColor? paperColor,
     String tag = '全部',
     bool isTask = false,
+    bool done = false,
+    bool isPinned = false,
   }) async {
     final note = _notes.create(
       title: title,
       content: content,
       reminderAt: reminderAt,
       priority: priority,
+      paperColor: paperColor,
       tag: tag,
       isTask: isTask,
+      done: done,
+      isPinned: isPinned,
     );
     await _persist([...state.notes, note]);
     await NotificationService.instance.schedule(note);
@@ -135,6 +142,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
         content: plan.content,
         reminderAt: plan.reminderAt,
         priority: plan.priority,
+        paperColor: noteColorFromPriority(plan.priority),
         tag: 'AI',
         isTask: true,
       );
@@ -156,6 +164,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
       content: plan.content,
       reminderAt: reminderAt ?? plan.reminderAt,
       priority: plan.priority,
+      paperColor: noteColorFromPriority(plan.priority),
       tag: tag,
       isTask: isTask,
     );

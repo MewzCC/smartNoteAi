@@ -1,6 +1,7 @@
 import 'package:uuid/uuid.dart';
 
 import '../../core/constants/hive_keys.dart';
+import '../../shared/enums/note_color.dart';
 import '../../shared/enums/note_priority.dart';
 import '../local/hive_boxes.dart';
 import '../models/note_model.dart';
@@ -34,8 +35,11 @@ class NoteRepository {
     required String content,
     DateTime? reminderAt,
     NotePriority priority = NotePriority.medium,
+    NoteColor? paperColor,
     String tag = '全部',
     bool isTask = false,
+    bool done = false,
+    bool isPinned = false,
   }) {
     return NoteModel(
       id: _uuid.v4(),
@@ -44,8 +48,11 @@ class NoteRepository {
       createdAt: DateTime.now(),
       reminderAt: reminderAt,
       priority: priority,
+      paperColor: paperColor ?? noteColorFromPriority(priority),
       tag: tag,
       isTask: isTask,
+      done: done,
+      isPinned: isPinned,
     );
   }
 
