@@ -14,6 +14,7 @@ import '../../../core/widgets/sticky_tag.dart';
 import '../../../shared/components/app_scaffold.dart';
 import '../../../shared/components/paper_background.dart';
 import '../../../shared/enums/note_priority.dart';
+import '../../notes/pages/note_reminder_page.dart';
 import '../provider/ai_provider.dart';
 
 class AiPage extends ConsumerStatefulWidget {
@@ -209,41 +210,19 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   Future<void> _pickPlanTime(int index) async {
     final current = _selectedTimes[index] ?? _fallbackFutureTime(index);
-    final picked = await _pickDateTime(current);
-    if (picked == null) return;
+    final result = await Navigator.of(context).push<NoteReminderResult>(
+      MaterialPageRoute(
+        builder: (context) => NoteReminderPage(initialTime: current),
+      ),
+    );
+    if (result == null || !mounted) return;
     setState(() {
-      _selectedTimes[index] = picked;
+      if (result.enabled && result.time != null) {
+        _selectedTimes[index] = result.time!;
+      } else {
+        _selectedTimes.remove(index);
+      }
     });
-  }
-
-  Future<DateTime?> _pickDateTime(DateTime current) async {
-    final now = DateTime.now();
-    final initial = current.isAfter(now) ? current : _nextFutureReminder();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      locale: const Locale('zh', 'CN'),
-    );
-    if (date == null || !mounted) return null;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
-    );
-    if (time == null) return null;
-    final selected = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
-    if (!selected.isAfter(DateTime.now())) {
-      ToastUtils.show('请选择未来时间');
-      return null;
-    }
-    return selected;
   }
 
   DateTime _fallbackFutureTime(int index) {
@@ -671,132 +650,17 @@ class _GeneratedPlanEditorPageState
   }
 
   Future<void> _pickReminder() async {
-    var draft = _reminderAt.isAfter(DateTime.now())
-        ? _reminderAt
-        : _nextFutureReminder();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: StatefulBuilder(
-            builder: (context, setSheetState) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '选择提醒时间',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.noteYellow.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('当前选择'),
-                      const SizedBox(height: 6),
-                      Text(
-                        formatFullTime(draft),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final initial = draft.isAfter(now)
-                              ? draft
-                              : _nextFutureReminder();
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: initial,
-                            firstDate: now,
-                            lastDate: now.add(const Duration(days: 365)),
-                            locale: const Locale('zh', 'CN'),
-                          );
-                          if (date == null) return;
-                          final next = DateTime(
-                            date.year,
-                            date.month,
-                            date.day,
-                            draft.hour,
-                            draft.minute,
-                          );
-                          setSheetState(
-                            () => draft = next.isAfter(now)
-                                ? next
-                                : _nextFutureReminder(),
-                          );
-                        },
-                        icon: const Icon(Icons.calendar_month_rounded),
-                        label: const Text('选择日期'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final initial = draft.isAfter(now)
-                              ? draft
-                              : _nextFutureReminder();
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.fromDateTime(initial),
-                          );
-                          if (time == null) return;
-                          final next = DateTime(
-                            draft.year,
-                            draft.month,
-                            draft.day,
-                            time.hour,
-                            time.minute,
-                          );
-                          if (!next.isAfter(now)) {
-                            ToastUtils.show('请选择未来时间');
-                            setSheetState(() => draft = _nextFutureReminder());
-                            return;
-                          }
-                          setSheetState(() => draft = next);
-                        },
-                        icon: const Icon(Icons.schedule_rounded),
-                        label: const Text('选择时间'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () {
-                    if (!draft.isAfter(DateTime.now())) {
-                      ToastUtils.show('请选择未来时间');
-                      return;
-                    }
-                    setState(() => _reminderAt = draft);
-                    Navigator.pop(sheetContext);
-                  },
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('确定提醒时间'),
-                ),
-              ],
-            ),
-          ),
-        ),
+    final result = await Navigator.of(context).push<NoteReminderResult>(
+      MaterialPageRoute(
+        builder: (context) => NoteReminderPage(initialTime: _reminderAt),
       ),
     );
+    if (result == null || !mounted) return;
+    if (!result.enabled || result.time == null) {
+      ToastUtils.show('AI 任务需要提醒时间，已保留原时间');
+      return;
+    }
+    setState(() => _reminderAt = result.time!);
   }
 
   Future<void> _createTag() async {
@@ -841,17 +705,6 @@ class _GeneratedPlanEditorPageState
       ),
     );
   }
-}
-
-DateTime _nextFutureReminder() {
-  final now = DateTime.now();
-  return DateTime(
-    now.year,
-    now.month,
-    now.day,
-    now.hour,
-    now.minute,
-  ).add(const Duration(minutes: 1));
 }
 
 class _HeroPanel extends StatelessWidget {
