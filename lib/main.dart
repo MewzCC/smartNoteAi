@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -46,7 +47,7 @@ class SmartNoteApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primary = Color(0xFF2F6DF6);
+    const primary = Color(0xFFFFE88A);
     const ink = Color(0xFF172033);
     final textTheme = GoogleFonts.notoSansScTextTheme().apply(
       bodyColor: ink,
@@ -56,27 +57,40 @@ class SmartNoteApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: '智能便签',
+      locale: const Locale('zh', 'CN'),
+      supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: primary, primary: primary),
-        scaffoldBackgroundColor: const Color(0xFFF5F7FB),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: primary,
+          primary: primary,
+          secondary: const Color(0xFFB5E7A1),
+          tertiary: const Color(0xFFB8D7FF),
+          surface: const Color(0xFFFFFBF3),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFFFFBF3),
         textTheme: textTheme,
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.transparent,
           elevation: 0,
           foregroundColor: ink,
-          centerTitle: false,
+          centerTitle: true,
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.78),
+          fillColor: const Color(0xFFFFF8D8).withValues(alpha: 0.55),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: const BorderSide(color: primary, width: 1.4),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFFFD84D), width: 1.2),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 18,
@@ -86,9 +100,41 @@ class SmartNoteApp extends StatelessWidget {
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: const Size(48, 52),
+            backgroundColor: const Color(0xFFFFE88A),
+            foregroundColor: const Color(0xFF2B2A25),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(12),
             ),
+          ),
+        ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: Color(0xFFFFE88A),
+          foregroundColor: Color(0xFF2B2A25),
+          elevation: 5,
+          shape: CircleBorder(),
+        ),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: const Color(0xFFFFFBF3),
+          headerBackgroundColor: const Color(0xFFFFE88A),
+          headerForegroundColor: const Color(0xFF2B2A25),
+          todayForegroundColor: WidgetStateProperty.all(
+            const Color(0xFF2B2A25),
+          ),
+          todayBorder: const BorderSide(color: Color(0xFFFFD84D), width: 1.4),
+          dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFF2B2A25);
+            }
+            return const Color(0xFF172033);
+          }),
+          dayBackgroundColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const Color(0xFFFFE88A);
+            }
+            return null;
+          }),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
           ),
         ),
       ),
@@ -738,7 +784,7 @@ class _AppShellState extends State<AppShell> {
       appBar: AppBar(
         title: Text(
           titles[_index],
-          style: GoogleFonts.dmSerifDisplay(fontSize: 32),
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
         ),
         actions: [
           Padding(
@@ -754,13 +800,21 @@ class _AppShellState extends State<AppShell> {
       body: Stack(
         children: [
           const Positioned.fill(child: SoftBackground()),
-          SafeArea(top: false, child: pages[_index]),
+          SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: pages[_index],
+              ),
+            ),
+          ),
         ],
       ),
       floatingActionButton: _index == 0
-          ? FloatingActionButton.extended(
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('新建'),
+          ? FloatingActionButton(
+              tooltip: '新建',
+              child: const Icon(Icons.add_rounded, size: 30),
               onPressed: () async {
                 final note = await Navigator.of(context).push<Note>(
                   MaterialPageRoute(builder: (_) => const NoteEditorPage()),
@@ -771,39 +825,55 @@ class _AppShellState extends State<AppShell> {
               },
             )
           : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: NavigationBar(
-              selectedIndex: _index,
-              onDestinationSelected: (value) => setState(() => _index = value),
-              backgroundColor: Colors.white.withValues(alpha: 0.72),
-              indicatorColor: const Color(0xFF2F6DF6).withValues(alpha: 0.12),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.checklist_rounded),
-                  label: '便签',
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: NavigationBar(
+                  height: 68,
+                  selectedIndex: _index,
+                  onDestinationSelected: (value) =>
+                      setState(() => _index = value),
+                  backgroundColor: const Color(
+                    0xFFFFFBF3,
+                  ).withValues(alpha: 0.88),
+                  indicatorColor: const Color(0xFFFFE88A),
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home_rounded),
+                      label: '首页',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.event_note_outlined),
+                      selectedIcon: Icon(Icons.event_note_rounded),
+                      label: '归档',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.star_border_rounded),
+                      selectedIcon: Icon(Icons.star_rounded),
+                      label: '成就',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.auto_awesome_outlined),
+                      selectedIcon: Icon(Icons.auto_awesome_rounded),
+                      label: '智能',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.person_outline_rounded),
+                      selectedIcon: Icon(Icons.person_rounded),
+                      label: '我的',
+                    ),
+                  ],
                 ),
-                NavigationDestination(
-                  icon: Icon(Icons.event_note_rounded),
-                  label: '归档',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.emoji_events_rounded),
-                  label: '成就',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.auto_awesome_rounded),
-                  label: '智能',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.person_rounded),
-                  label: '我的',
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -857,37 +927,29 @@ class SummaryCard extends StatelessWidget {
     return GlassPanel(
       padding: const EdgeInsets.all(22),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
+          Column(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2F6DF6),
-                  borderRadius: BorderRadius.circular(18),
+                  color: const Color(0xFFFFE88A),
+                  shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.bolt_rounded, color: Colors.white),
+                child: const Icon(Icons.bolt_rounded, color: Color(0xFF2B2A25)),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      DateFormat('M月d日 EEEE', 'zh_CN').format(DateTime.now()),
-                      style: const TextStyle(color: Color(0xFF667085)),
-                    ),
-                    const Text(
-                      '下一代智能任务助手',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 17,
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 12),
+              Text(
+                DateFormat('M月d日 EEEE', 'zh_CN').format(DateTime.now()),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFF667085)),
+              ),
+              const Text(
+                '下一代智能任务助手',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
             ],
           ),
@@ -897,8 +959,8 @@ class SummaryCard extends StatelessWidget {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 9,
-              backgroundColor: const Color(0xFFE6ECF7),
-              valueColor: const AlwaysStoppedAnimation(Color(0xFF2F6DF6)),
+              backgroundColor: const Color(0xFFFFF6C8),
+              valueColor: const AlwaysStoppedAnimation(Color(0xFFFFD84D)),
             ),
           ),
           const SizedBox(height: 16),
@@ -947,6 +1009,24 @@ class StatPill extends StatelessWidget {
   }
 }
 
+Color _notePaperColor(Note note) {
+  if (note.done) return const Color(0xFFF6F6F6);
+  return switch (note.priority) {
+    TaskPriority.high => const Color(0xFFFFB7C5),
+    TaskPriority.medium => const Color(0xFFFFE88A),
+    TaskPriority.low => const Color(0xFFB5E7A1),
+  };
+}
+
+Color _notePinColor(Note note) {
+  if (note.done) return const Color(0xFF98A2B3);
+  return switch (note.priority) {
+    TaskPriority.high => const Color(0xFFE86C52),
+    TaskPriority.medium => const Color(0xFFC28100),
+    TaskPriority.low => const Color(0xFF54A58A),
+  };
+}
+
 class NoteCard extends StatelessWidget {
   const NoteCard({super.key, required this.note});
 
@@ -956,6 +1036,8 @@ class NoteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = context.read<AppStore>();
     final color = note.done ? const Color(0xFF98A2B3) : const Color(0xFF172033);
+    final paperColor = _notePaperColor(note);
+    final pinColor = _notePinColor(note);
     return Dismissible(
       key: ValueKey(note.id),
       direction: DismissDirection.horizontal,
@@ -968,7 +1050,7 @@ class NoteCard extends StatelessWidget {
       background: const DismissBg(alignment: Alignment.centerLeft),
       secondaryBackground: const DismissBg(alignment: Alignment.centerRight),
       child: InkWell(
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(18),
         onTap: () async {
           final updated = await Navigator.of(context).push<Note>(
             MaterialPageRoute(builder: (_) => NoteEditorPage(note: note)),
@@ -977,41 +1059,72 @@ class NoteCard extends StatelessWidget {
             await context.read<AppStore>().updateNote(updated);
           }
         },
-        child: GlassPanel(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          decoration: BoxDecoration(
+            color: paperColor.withValues(alpha: note.done ? 0.72 : 0.62),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+            boxShadow: [
+              BoxShadow(
+                color: pinColor.withValues(alpha: 0.16),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Stack(
             children: [
-              Semantics(
-                button: true,
-                selected: note.done,
-                label: note.done ? '标记为未完成' : '标记为已完成',
-                child: IconButton.filledTonal(
-                  tooltip: note.done ? '标记为未完成' : '标记为已完成',
-                  onPressed: () => store.toggleDone(note.id),
-                  icon: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: Icon(
-                      note.done
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      key: ValueKey(note.done),
-                    ),
+              Positioned(
+                top: -4,
+                right: 10,
+                child: Transform.rotate(
+                  angle: 0.18,
+                  child: Icon(
+                    Icons.push_pin_rounded,
+                    color: pinColor,
+                    size: 22,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    button: true,
+                    selected: note.done,
+                    label: note.done ? '标记为未完成' : '标记为已完成',
+                    child: IconButton(
+                      tooltip: note.done ? '标记为未完成' : '标记为已完成',
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size(38, 38),
+                        backgroundColor: Colors.white.withValues(alpha: 0.72),
+                        foregroundColor: pinColor,
+                      ),
+                      onPressed: () => store.toggleDone(note.id),
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(
+                          note.done
+                              ? Icons.check_box_rounded
+                              : Icons.check_box_outline_blank_rounded,
+                          key: ValueKey(note.done),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
+                        Padding(
+                          padding: const EdgeInsets.only(right: 38),
                           child: Text(
                             note.title,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.left,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
@@ -1022,45 +1135,45 @@ class NoteCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        PriorityBadge(priority: note.priority),
+                        const SizedBox(height: 8),
+                        Text(
+                          note.content,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: color.withValues(alpha: 0.78),
+                            height: 1.5,
+                            decoration: note.done
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            PriorityBadge(priority: note.priority),
+                            MetaChip(
+                              icon: Icons.schedule_rounded,
+                              label: note.reminderAt == null
+                                  ? '未设置提醒'
+                                  : DateFormat(
+                                      'MM/dd HH:mm',
+                                    ).format(note.reminderAt!),
+                            ),
+                            MetaChip(
+                              icon: Icons.calendar_today_rounded,
+                              label: DateFormat(
+                                'MM/dd HH:mm',
+                              ).format(note.createdAt),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      note.content,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: color.withValues(alpha: 0.78),
-                        height: 1.5,
-                        decoration: note.done
-                            ? TextDecoration.lineThrough
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        MetaChip(
-                          icon: Icons.schedule_rounded,
-                          label: note.reminderAt == null
-                              ? '未设置提醒'
-                              : DateFormat(
-                                  'MM/dd HH:mm',
-                                ).format(note.reminderAt!),
-                        ),
-                        MetaChip(
-                          icon: Icons.calendar_today_rounded,
-                          label: DateFormat(
-                            'MM/dd HH:mm',
-                          ).format(note.createdAt),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1095,14 +1208,25 @@ class DismissBg extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Align(
       alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE86C52),
-        borderRadius: BorderRadius.circular(26),
+      child: Container(
+        width: 76,
+        height: 76,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE86C52),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE86C52).withValues(alpha: 0.24),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white),
       ),
-      child: const Icon(Icons.delete_rounded, color: Colors.white),
     );
   }
 }
@@ -1122,9 +1246,9 @@ class ArchivePage extends StatelessWidget {
         GlassPanel(
           padding: const EdgeInsets.all(20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
+              Column(
                 children: [
                   Container(
                     width: 48,
@@ -1138,27 +1262,17 @@ class ArchivePage extends StatelessWidget {
                       color: Color(0xFF2F6DF6),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '归档日期',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          '查看某一天，以及这天以前留下的计划。',
-                          style: TextStyle(
-                            color: const Color(
-                              0xFF667085,
-                            ).withValues(alpha: 0.9),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 12),
+                  const Text(
+                    '归档日期',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                  ),
+                  Text(
+                    '查看某一天，以及这天以前留下的计划。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: const Color(0xFF667085).withValues(alpha: 0.9),
                     ),
                   ),
                 ],
@@ -1209,6 +1323,10 @@ class ArchivePage extends StatelessWidget {
       initialDate: selected,
       firstDate: DateTime(now.year - 5),
       lastDate: now.add(const Duration(days: 365)),
+      locale: const Locale('zh', 'CN'),
+      helpText: '选择归档日期',
+      cancelText: '取消',
+      confirmText: '确定',
     );
     if (picked != null && context.mounted) {
       context.read<AppStore>().setArchiveDate(picked);
@@ -1249,9 +1367,79 @@ class ArchiveSection extends StatelessWidget {
           for (final note in notes)
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
-              child: NoteCard(note: note),
+              child: ArchiveNoteCard(note: note),
             ),
       ],
+    );
+  }
+}
+
+class ArchiveNoteCard extends StatelessWidget {
+  const ArchiveNoteCard({super.key, required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final paperColor = _notePaperColor(note);
+    final pinColor = _notePinColor(note);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: paperColor.withValues(alpha: note.done ? 0.64 : 0.58),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+        boxShadow: [
+          BoxShadow(
+            color: pinColor.withValues(alpha: 0.13),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.68),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              note.done ? Icons.check_rounded : Icons.description_outlined,
+              color: pinColor,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  note.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    decoration: note.done ? TextDecoration.lineThrough : null,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '归档时间：${DateFormat('yyyy/MM/dd').format(note.createdAt)}',
+                  style: const TextStyle(
+                    color: Color(0xFF667085),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PriorityBadge(priority: note.priority),
+        ],
+      ),
     );
   }
 }
@@ -1269,9 +1457,9 @@ class AchievementPage extends StatelessWidget {
         GlassPanel(
           padding: const EdgeInsets.all(22),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
+              Column(
                 children: [
                   Container(
                     width: 52,
@@ -1285,15 +1473,11 @@ class AchievementPage extends StatelessWidget {
                       color: Color(0xFFC28100),
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Text(
-                      '完成不是清空列表，而是在给自己留下证据。',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '完成不是清空列表，而是在给自己留下证据。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                   ),
                 ],
               ),
@@ -1310,6 +1494,7 @@ class AchievementPage extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 '完成率 ${(rate * 100).round()}%',
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: Color(0xFF667085)),
               ),
             ],
@@ -1391,26 +1576,53 @@ class AchievementMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
+    return Container(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
         children: [
-          Icon(icon, color: color, size: 28),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Transform.rotate(
+              angle: -0.16,
+              child: Icon(Icons.push_pin_rounded, color: color, size: 20),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 30),
+                const SizedBox(height: 12),
+                Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-              Text(label, style: const TextStyle(color: Color(0xFF667085))),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFF667085)),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -2012,6 +2224,10 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       initialDate: _reminderAt ?? now,
+      locale: const Locale('zh', 'CN'),
+      helpText: '选择提醒日期',
+      cancelText: '取消',
+      confirmText: '确定',
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
@@ -2134,7 +2350,7 @@ class EmptyState extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
           ),
           SizedBox(height: 6),
-          Text('点击右下角新建，或到智能页面自动生成计划。', textAlign: TextAlign.center),
+          Text('点击底部加号新建，或到智能页面自动生成计划。', textAlign: TextAlign.center),
         ],
       ),
     );
@@ -2154,20 +2370,20 @@ class GlassPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+            color: const Color(0xFFFFFDF6).withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFFFF0B5)),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF2D3B58).withValues(alpha: 0.08),
-                blurRadius: 30,
-                offset: const Offset(0, 18),
+                color: const Color(0xFF6B5F3B).withValues(alpha: 0.10),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
@@ -2188,7 +2404,7 @@ class SoftBackground extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF8FBFF), Color(0xFFEFF4FF), Color(0xFFF9FAFB)],
+          colors: [Color(0xFFFFFCF4), Color(0xFFFFF7DF), Color(0xFFFFFBF3)],
         ),
       ),
       child: CustomPaint(painter: _BackgroundPainter()),
@@ -2200,13 +2416,13 @@ class _BackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final fill = Paint()..style = PaintingStyle.fill;
-    fill.color = const Color(0xFFBFD5FF).withValues(alpha: 0.32);
-    canvas.drawCircle(Offset(size.width * 0.9, size.height * 0.08), 120, fill);
-    fill.color = const Color(0xFFFFD6C7).withValues(alpha: 0.34);
+    fill.color = const Color(0xFFFFE88A).withValues(alpha: 0.34);
+    canvas.drawCircle(Offset(size.width * 0.88, size.height * 0.08), 124, fill);
+    fill.color = const Color(0xFFB5E7A1).withValues(alpha: 0.22);
     canvas.drawCircle(Offset(size.width * 0.02, size.height * 0.24), 100, fill);
 
     final grid = Paint()
-      ..color = const Color(0xFF172033).withValues(alpha: 0.035)
+      ..color = const Color(0xFFD6C58B).withValues(alpha: 0.20)
       ..strokeWidth = 1;
     for (double x = 0; x < size.width; x += 32) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
