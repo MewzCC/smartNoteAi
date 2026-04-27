@@ -1,0 +1,59 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../data/models/note_model.dart';
+import '../../../shared/components/empty_state.dart';
+import '../provider/home_provider.dart';
+
+class TodayTaskSection extends ConsumerWidget {
+  const TodayTaskSection({super.key, required this.notes});
+
+  final List<NoteModel> notes;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tasks = notes.where((note) => note.isTask).take(3).toList();
+    if (tasks.isEmpty) {
+      return const EmptyState(
+        text: '暂无今日任务',
+        icon: Icons.check_box_outlined,
+        height: 76,
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          for (final note in tasks)
+            CheckboxListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              value: note.done,
+              onChanged: (_) =>
+                  ref.read(smartNoteProvider.notifier).toggleDone(note.id),
+              title: Text(
+                note.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  decoration: note.done ? TextDecoration.lineThrough : null,
+                ),
+              ),
+              secondary: Text(
+                note.reminderAt == null
+                    ? ''
+                    : '${note.reminderAt!.hour.toString().padLeft(2, '0')}:${note.reminderAt!.minute.toString().padLeft(2, '0')}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
