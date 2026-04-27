@@ -46,7 +46,7 @@ class SmartNoteState {
       [...activeNotes.where((note) => !note.isArchived)]..sort((a, b) {
         if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
         if (a.done != b.done) return a.done ? 1 : -1;
-        return b.createdAt.compareTo(a.createdAt);
+        return _compareRecentFirst(a, b);
       });
 
   List<NoteModel> get archivedNotes =>
@@ -148,14 +148,16 @@ class SmartNoteController extends Notifier<SmartNoteState> {
   Future<void> addGeneratedPlan(
     GeneratedPlan plan, {
     DateTime? reminderAt,
+    String tag = 'AI',
+    bool isTask = true,
   }) async {
     final created = _notes.create(
       title: plan.title,
       content: plan.content,
       reminderAt: reminderAt ?? plan.reminderAt,
       priority: plan.priority,
-      tag: 'AI',
-      isTask: true,
+      tag: tag,
+      isTask: isTask,
     );
     await _persist([...state.notes, created]);
     await NotificationService.instance.schedule(created);
@@ -249,7 +251,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
 
   Future<void> generate(String prompt) async {
     if (prompt.trim().isEmpty) return;
-    state = state.copyWith(generating: true);
+    state = state.copyWith(generating: true, generatedPlans: []);
     try {
       final plans = await _ai.generate(config: state.config, prompt: prompt);
       state = state.copyWith(generatedPlans: plans, generating: false);
@@ -268,3 +270,13 @@ class SmartNoteController extends Notifier<SmartNoteState> {
 final smartNoteProvider = NotifierProvider<SmartNoteController, SmartNoteState>(
   SmartNoteController.new,
 );
+
+int _compareRecentFirst(NoteModel a, NoteModel b) {
+  final now = DateTime.now();
+  final aTime = a.reminderAt ?? a.createdAt;
+  final bTime = b.reminderAt ?? b.createdAt;
+  final aFuture = !aTime.isBefore(now);
+  final bFuture = !bTime.isBefore(now);
+  if (aFuture != bFuture) return aFuture ? -1 : 1;
+  return aFuture ? aTime.compareTo(bTime) : bTime.compareTo(aTime);
+}

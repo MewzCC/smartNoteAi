@@ -9,7 +9,11 @@ import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/toast_utils.dart';
 import '../../../core/widgets/sticky_app_bar.dart';
 import '../../../core/widgets/sticky_button.dart';
+import '../../../core/widgets/sticky_input.dart';
+import '../../../core/widgets/sticky_tag.dart';
 import '../../../shared/components/app_scaffold.dart';
+import '../../../shared/components/paper_background.dart';
+import '../../../shared/enums/note_priority.dart';
 import '../provider/ai_provider.dart';
 
 class AiPage extends ConsumerStatefulWidget {
@@ -24,6 +28,9 @@ class _AiPageState extends ConsumerState<AiPage> {
   final _scrollController = ScrollController();
   final _resultKey = GlobalKey();
   final Map<int, DateTime> _selectedTimes = {};
+  final Map<int, NotePriority> _selectedPriorities = {};
+  final Map<int, String> _selectedTags = {};
+  final Map<int, bool> _selectedTaskFlags = {};
   final Map<int, TextEditingController> _titleControllers = {};
   final Map<int, TextEditingController> _contentControllers = {};
   final Set<int> _dismissedResults = {};
@@ -127,20 +134,21 @@ class _AiPageState extends ConsumerState<AiPage> {
                 _SlideAway(
                   slideAway: _dismissedResults.contains(entry.key),
                   child: _GeneratedPlanCard(
-                    titleController: _titleControllerFor(
+                    title: _titleControllerFor(
                       entry.key,
                       entry.value.title,
-                    ),
-                    contentController: _contentControllerFor(
+                    ).text,
+                    content: _contentControllerFor(
                       entry.key,
                       entry.value.content,
-                    ),
+                    ).text,
                     reminderAt:
                         _selectedTimes[entry.key] ??
                         entry.value.reminderAt ??
                         _fallbackFutureTime(entry.key),
                     onPickTime: () => _pickPlanTime(entry.key),
                     onAdd: () => _addOneGenerated(entry),
+                    onEdit: () => _editGeneratedPlan(entry),
                   ),
                 ),
             ],
@@ -200,8 +208,16 @@ class _AiPageState extends ConsumerState<AiPage> {
   }
 
   Future<void> _pickPlanTime(int index) async {
-    final now = DateTime.now();
     final current = _selectedTimes[index] ?? _fallbackFutureTime(index);
+    final picked = await _pickDateTime(current);
+    if (picked == null) return;
+    setState(() {
+      _selectedTimes[index] = picked;
+    });
+  }
+
+  Future<DateTime?> _pickDateTime(DateTime current) async {
+    final now = DateTime.now();
     final date = await showDatePicker(
       context: context,
       initialDate: current.isAfter(now)
@@ -211,21 +227,13 @@ class _AiPageState extends ConsumerState<AiPage> {
       lastDate: now.add(const Duration(days: 365)),
       locale: const Locale('zh', 'CN'),
     );
-    if (date == null || !mounted) return;
+    if (date == null || !mounted) return null;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(current),
     );
-    if (time == null) return;
-    setState(() {
-      _selectedTimes[index] = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        time.hour,
-        time.minute,
-      );
-    });
+    if (time == null) return null;
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
   }
 
   DateTime _fallbackFutureTime(int index) {
@@ -261,6 +269,9 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
     setState(() {
       _selectedTimes.clear();
+      _selectedPriorities.clear();
+      _selectedTags.clear();
+      _selectedTaskFlags.clear();
       _dismissedResults.clear();
       _titleControllers.clear();
       _contentControllers.clear();
@@ -284,7 +295,40 @@ class _AiPageState extends ConsumerState<AiPage> {
         entry.key,
         entry.value.content,
       ).text.trim(),
+      priority: _selectedPriorities[entry.key] ?? entry.value.priority,
     );
+  }
+
+  Future<void> _editGeneratedPlan(MapEntry<int, GeneratedPlan> entry) async {
+    final result = await Navigator.of(context).push<_GeneratedEditResult>(
+      MaterialPageRoute(
+        builder: (context) => _GeneratedPlanEditorPage(
+          initialTitle: _titleControllerFor(entry.key, entry.value.title).text,
+          initialContent: _contentControllerFor(
+            entry.key,
+            entry.value.content,
+          ).text,
+          initialReminderAt:
+              _selectedTimes[entry.key] ??
+              entry.value.reminderAt ??
+              _fallbackFutureTime(entry.key),
+          initialPriority:
+              _selectedPriorities[entry.key] ?? entry.value.priority,
+          initialTag: _selectedTags[entry.key] ?? 'AI',
+          initialIsTask: _selectedTaskFlags[entry.key] ?? true,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _titleControllerFor(entry.key, entry.value.title).text = result.title;
+      _contentControllerFor(entry.key, entry.value.content).text =
+          result.content;
+      _selectedTimes[entry.key] = result.reminderAt;
+      _selectedPriorities[entry.key] = result.priority;
+      _selectedTags[entry.key] = result.tag;
+      _selectedTaskFlags[entry.key] = result.isTask;
+    });
   }
 
   Future<void> _addOneGenerated(MapEntry<int, GeneratedPlan> entry) async {
@@ -294,7 +338,12 @@ class _AiPageState extends ConsumerState<AiPage> {
         _fallbackFutureTime(entry.key);
     await ref
         .read(smartNoteProvider.notifier)
-        .addGeneratedPlan(_editedPlan(entry), reminderAt: time);
+        .addGeneratedPlan(
+          _editedPlan(entry),
+          reminderAt: time,
+          tag: _selectedTags[entry.key] ?? 'AI',
+          isTask: _selectedTaskFlags[entry.key] ?? true,
+        );
     setState(() => _dismissedResults.add(entry.key));
     ToastUtils.show('已加入任务');
   }
@@ -309,7 +358,12 @@ class _AiPageState extends ConsumerState<AiPage> {
           _fallbackFutureTime(entry.key);
       await ref
           .read(smartNoteProvider.notifier)
-          .addGeneratedPlan(_editedPlan(entry), reminderAt: time);
+          .addGeneratedPlan(
+            _editedPlan(entry),
+            reminderAt: time,
+            tag: _selectedTags[entry.key] ?? 'AI',
+            isTask: _selectedTaskFlags[entry.key] ?? true,
+          );
     }
     setState(() {
       _dismissedResults.addAll(entries.map((entry) => entry.key));
@@ -346,84 +400,424 @@ class _SlideAway extends StatelessWidget {
 
 class _GeneratedPlanCard extends StatelessWidget {
   const _GeneratedPlanCard({
-    required this.titleController,
-    required this.contentController,
+    required this.title,
+    required this.content,
     required this.reminderAt,
     required this.onPickTime,
     required this.onAdd,
+    required this.onEdit,
   });
 
-  final TextEditingController titleController;
-  final TextEditingController contentController;
+  final String title;
+  final String content;
   final DateTime reminderAt;
   final VoidCallback onPickTime;
   final VoidCallback onAdd;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 214,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.noteYellow,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: AppShadows.card,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: titleController,
-            maxLines: 1,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: InputBorder.none,
-              filled: false,
-              hintText: '标题',
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onEdit,
+      child: Container(
+        height: 214,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.noteYellow,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppShadows.card,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title.isEmpty ? '未命名任务' : title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
             ),
-            style: const TextStyle(fontWeight: FontWeight.w900),
-          ),
-          Expanded(
-            child: TextField(
-              controller: contentController,
-              maxLines: null,
-              expands: true,
-              decoration: const InputDecoration(
-                isDense: true,
-                border: InputBorder.none,
-                filled: false,
-                hintText: '内容',
+            const SizedBox(height: 12),
+            Expanded(
+              child: Text(
+                content.isEmpty ? '点击编辑内容' : content,
+                maxLines: 5,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(height: 1.45),
               ),
-              style: const TextStyle(height: 1.4),
             ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onPickTime,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.accentText,
-                    side: const BorderSide(color: AppColors.accentText),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onPickTime,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.accentText,
+                      side: const BorderSide(color: AppColors.accentText),
+                    ),
+                    icon: const Icon(Icons.alarm_rounded, size: 18),
+                    label: FittedBox(child: Text(formatFullTime(reminderAt))),
                   ),
-                  icon: const Icon(Icons.alarm_rounded, size: 18),
-                  label: FittedBox(child: Text(formatFullTime(reminderAt))),
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: onAdd,
-                style: FilledButton.styleFrom(
-                  foregroundColor: AppColors.accentText,
-                  backgroundColor: Colors.white.withValues(alpha: 0.46),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: onAdd,
+                  style: FilledButton.styleFrom(
+                    foregroundColor: AppColors.accentText,
+                    backgroundColor: Colors.white.withValues(alpha: 0.46),
+                  ),
+                  icon: const Icon(Icons.add_task_rounded, size: 18),
+                  label: const Text('加入这条'),
                 ),
-                icon: const Icon(Icons.add_task_rounded, size: 18),
-                label: const Text('加入这条'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GeneratedEditResult {
+  const _GeneratedEditResult({
+    required this.title,
+    required this.content,
+    required this.reminderAt,
+    required this.priority,
+    required this.tag,
+    required this.isTask,
+  });
+
+  final String title;
+  final String content;
+  final DateTime reminderAt;
+  final NotePriority priority;
+  final String tag;
+  final bool isTask;
+}
+
+class _GeneratedPlanEditorPage extends ConsumerStatefulWidget {
+  const _GeneratedPlanEditorPage({
+    required this.initialTitle,
+    required this.initialContent,
+    required this.initialReminderAt,
+    required this.initialPriority,
+    required this.initialTag,
+    required this.initialIsTask,
+  });
+
+  final String initialTitle;
+  final String initialContent;
+  final DateTime initialReminderAt;
+  final NotePriority initialPriority;
+  final String initialTag;
+  final bool initialIsTask;
+
+  @override
+  ConsumerState<_GeneratedPlanEditorPage> createState() =>
+      _GeneratedPlanEditorPageState();
+}
+
+class _GeneratedPlanEditorPageState
+    extends ConsumerState<_GeneratedPlanEditorPage> {
+  late final TextEditingController _title;
+  late final TextEditingController _content;
+  late final TextEditingController _newTag;
+  late DateTime _reminderAt;
+  late NotePriority _priority;
+  late String _tag;
+  late bool _isTask;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = TextEditingController(text: widget.initialTitle);
+    _content = TextEditingController(text: widget.initialContent);
+    _newTag = TextEditingController();
+    _reminderAt = widget.initialReminderAt;
+    _priority = widget.initialPriority;
+    _tag = widget.initialTag;
+    _isTask = widget.initialIsTask;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _content.dispose();
+    _newTag.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(smartNoteProvider);
+    final tags = <String>{
+      ...state.config.customTags,
+      ...state.notes.map((note) => note.tag),
+      'AI',
+    }.where((tag) => tag.trim().isNotEmpty).toList();
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: PaperBackground(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                children: [
+                  StickyAppBar(
+                    title: '编辑生成任务',
+                    showBack: true,
+                    showSearch: false,
+                    trailing: TextButton(
+                      onPressed: _save,
+                      child: const Text('完成'),
+                    ),
+                  ),
+                  TextField(
+                    controller: _title,
+                    decoration: const InputDecoration(
+                      hintText: '标题（可选）',
+                      filled: false,
+                      border: InputBorder.none,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 220,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.noteYellow,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: _content,
+                      expands: true,
+                      maxLines: null,
+                      decoration: const InputDecoration(
+                        hintText: '开始记录你的想法...',
+                        filled: false,
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    children: [
+                      for (final item in NotePriority.values)
+                        ChoiceChip(
+                          selected: item == _priority,
+                          label: Text('${item.label}优先级'),
+                          onSelected: (_) => setState(() => _priority = item),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final tag in tags)
+                        StickyTag(
+                          label: tag,
+                          selected: tag == _tag,
+                          onTap: () => setState(() => _tag = tag),
+                        ),
+                      ActionChip(
+                        avatar: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('新建标签'),
+                        onPressed: _createTag,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('加入任务'),
+                    subtitle: const Text('开启后才会出现在任务页'),
+                    value: _isTask,
+                    onChanged: (value) => setState(() => _isTask = value),
+                  ),
+                  const SizedBox(height: 4),
+                  ListTile(
+                    leading: const Icon(Icons.alarm_rounded),
+                    title: Text(formatFullTime(_reminderAt)),
+                    subtitle: const Text('已选择具体提醒时间，保存后会创建系统提醒'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: _pickReminder,
+                  ),
+                ],
               ),
-            ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickReminder() async {
+    var draft = _reminderAt;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: StatefulBuilder(
+            builder: (context, setSheetState) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  '选择提醒时间',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.noteYellow.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('当前选择'),
+                      const SizedBox(height: 6),
+                      Text(
+                        formatFullTime(draft),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final now = DateTime.now();
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: draft.isAfter(now)
+                                ? draft
+                                : now.add(const Duration(days: 1)),
+                            firstDate: now,
+                            lastDate: now.add(const Duration(days: 365)),
+                            locale: const Locale('zh', 'CN'),
+                          );
+                          if (date == null) return;
+                          setSheetState(() {
+                            draft = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              draft.hour,
+                              draft.minute,
+                            );
+                          });
+                        },
+                        icon: const Icon(Icons.calendar_month_rounded),
+                        label: const Text('选择日期'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final now = DateTime.now();
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(draft),
+                          );
+                          if (time == null) return;
+                          final next = DateTime(
+                            draft.year,
+                            draft.month,
+                            draft.day,
+                            time.hour,
+                            time.minute,
+                          );
+                          setSheetState(() {
+                            draft = next.isAfter(now)
+                                ? next
+                                : now.add(const Duration(hours: 1));
+                          });
+                        },
+                        icon: const Icon(Icons.schedule_rounded),
+                        label: const Text('选择时间'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (!draft.isAfter(DateTime.now())) {
+                      ToastUtils.show('请选择未来时间');
+                      return;
+                    }
+                    setState(() => _reminderAt = draft);
+                    Navigator.pop(sheetContext);
+                  },
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('确定提醒时间'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _createTag() async {
+    _newTag.clear();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('新建标签'),
+        content: StickyInput(controller: _newTag, hint: '输入标签名称'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, _newTag.text.trim()),
+            child: const Text('确定'),
           ),
         ],
+      ),
+    );
+    if (value == null || value.isEmpty) return;
+    await ref.read(smartNoteProvider.notifier).addCustomTag(value);
+    setState(() => _tag = value);
+  }
+
+  void _save() {
+    final content = _content.text.trim();
+    if (content.isEmpty) {
+      ToastUtils.show('请填写内容');
+      return;
+    }
+    Navigator.pop(
+      context,
+      _GeneratedEditResult(
+        title: _title.text.trim().isEmpty ? '未命名任务' : _title.text.trim(),
+        content: content,
+        reminderAt: _reminderAt,
+        priority: _priority,
+        tag: _tag,
+        isTask: _isTask,
       ),
     );
   }

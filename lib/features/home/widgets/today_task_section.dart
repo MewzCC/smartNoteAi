@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/date_utils.dart';
 import '../../../data/models/note_model.dart';
 import '../../../shared/components/empty_state.dart';
 import '../provider/home_provider.dart';
@@ -13,7 +14,19 @@ class TodayTaskSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final tasks = notes.where((note) => note.isTask).take(3).toList();
+    final today = dateOnly(DateTime.now());
+    final tasks =
+        notes
+            .where(
+              (note) =>
+                  note.isTask &&
+                  !note.done &&
+                  note.reminderAt != null &&
+                  dateOnly(note.reminderAt!).isAtSameMomentAs(today),
+            )
+            .toList()
+          ..sort((a, b) => a.reminderAt!.compareTo(b.reminderAt!));
+    final shownTasks = tasks.take(3).toList();
     if (tasks.isEmpty) {
       return const EmptyState(
         text: '暂无今日任务',
@@ -30,7 +43,7 @@ class TodayTaskSection extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          for (final note in tasks)
+          for (final note in shownTasks)
             CheckboxListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
