@@ -31,12 +31,19 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
   @override
   void initState() {
     super.initState();
-    _enabled = widget.initialTime != null;
-    _draft = widget.initialTime ?? DateTime.now().add(const Duration(hours: 1));
+    final minimum = _minimumReminderTime();
+    final initial = widget.initialTime;
+    _enabled = initial != null;
+    _draft = initial != null && initial.isAfter(minimum)
+        ? initial
+        : minimum.add(const Duration(minutes: 1));
   }
 
   @override
   Widget build(BuildContext context) {
+    final minimum = _minimumReminderTime();
+    final canFinish = !_enabled || _draft.isAfter(minimum);
+
     return Scaffold(
       body: PaperBackground(
         child: Center(
@@ -51,7 +58,7 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
                     showBack: true,
                     showSearch: false,
                     trailing: TextButton(
-                      onPressed: _finish,
+                      onPressed: canFinish ? _finish : null,
                       child: const Text('完成'),
                     ),
                   ),
@@ -63,7 +70,7 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    '${_draft.year}年${_draft.month}月${_draft.day}日  ${_weekdayText(_draft)}',
+                    '${_draft.year}年${_draft.month}月${_draft.day}日 ${_weekdayText(_draft)}',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
@@ -73,13 +80,19 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
                     child: CupertinoDatePicker(
                       mode: CupertinoDatePickerMode.dateAndTime,
                       initialDateTime: _draft,
-                      minimumDate: DateTime.now(),
+                      minimumDate: minimum,
                       maximumDate: DateTime.now().add(
                         const Duration(days: 365),
                       ),
+                      minuteInterval: 1,
                       use24hFormat: true,
                       onDateTimeChanged: (value) {
-                        setState(() => _draft = value);
+                        final min = _minimumReminderTime();
+                        setState(() {
+                          _draft = value.isAfter(min)
+                              ? value
+                              : min.add(const Duration(minutes: 1));
+                        });
                       },
                     ),
                   ),
@@ -123,6 +136,11 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    '已过去的时间不可选择，请选择当前时间之后的提醒。',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 ],
               ),
             ),
@@ -140,7 +158,7 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
       );
       return;
     }
-    if (!_draft.isAfter(DateTime.now())) {
+    if (!_draft.isAfter(_minimumReminderTime())) {
       ToastUtils.show('请选择未来时间');
       return;
     }
@@ -148,6 +166,11 @@ class _NoteReminderPageState extends State<NoteReminderPage> {
       context,
       NoteReminderResult(enabled: true, time: _draft),
     );
+  }
+
+  DateTime _minimumReminderTime() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, now.hour, now.minute);
   }
 
   String _weekdayText(DateTime value) {
