@@ -7,7 +7,7 @@ import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/utils/date_utils.dart';
 import '../../data/models/note_model.dart';
-import '../../shared/enums/note_priority.dart';
+import '../../shared/enums/note_color.dart';
 
 class StickyCard extends StatelessWidget {
   const StickyCard({
@@ -160,18 +160,10 @@ class StickyCard extends StatelessWidget {
 
   Color _paperColor(NoteModel note) {
     if (note.isArchived) return const Color(0xFFF5F2EA);
-    return switch (note.priority) {
-      NotePriority.high => AppColors.notePink,
-      NotePriority.medium => AppColors.noteYellow,
-      NotePriority.low => AppColors.noteGreen,
-    };
+    return note.paperColor.color;
   }
 
   Color _accentColor(NoteModel note) {
-    return switch (note.priority) {
-      NotePriority.high => const Color(0xFFFF7892),
-      NotePriority.medium => AppColors.accentText,
-      NotePriority.low => const Color(0xFF67C77A),
-    };
+    return note.paperColor.accent;
   }
 }

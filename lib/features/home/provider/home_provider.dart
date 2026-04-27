@@ -8,6 +8,7 @@ import '../../../data/models/user_config_model.dart';
 import '../../../data/repositories/ai_repository.dart';
 import '../../../data/repositories/note_repository.dart';
 import '../../../data/repositories/user_repository.dart';
+import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
 
 class SmartNoteState {
@@ -46,7 +47,7 @@ class SmartNoteState {
       [...activeNotes.where((note) => !note.isArchived)]..sort((a, b) {
         if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
         if (a.done != b.done) return a.done ? 1 : -1;
-        return b.createdAt.compareTo(a.createdAt);
+        return _compareRecentFirst(a, b);
       });
 
   List<NoteModel> get archivedNotes =>
@@ -113,16 +114,22 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     required String content,
     DateTime? reminderAt,
     NotePriority priority = NotePriority.medium,
+    NoteColor? paperColor,
     String tag = '全部',
     bool isTask = false,
+    bool done = false,
+    bool isPinned = false,
   }) async {
     final note = _notes.create(
       title: title,
       content: content,
       reminderAt: reminderAt,
       priority: priority,
+      paperColor: paperColor,
       tag: tag,
       isTask: isTask,
+      done: done,
+      isPinned: isPinned,
     );
     await _persist([...state.notes, note]);
     await NotificationService.instance.schedule(note);
@@ -135,6 +142,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
         content: plan.content,
         reminderAt: plan.reminderAt,
         priority: plan.priority,
+        paperColor: noteColorFromPriority(plan.priority),
         tag: 'AI',
         isTask: true,
       );
@@ -148,14 +156,17 @@ class SmartNoteController extends Notifier<SmartNoteState> {
   Future<void> addGeneratedPlan(
     GeneratedPlan plan, {
     DateTime? reminderAt,
+    String tag = 'AI',
+    bool isTask = true,
   }) async {
     final created = _notes.create(
       title: plan.title,
       content: plan.content,
       reminderAt: reminderAt ?? plan.reminderAt,
       priority: plan.priority,
-      tag: 'AI',
-      isTask: true,
+      paperColor: noteColorFromPriority(plan.priority),
+      tag: tag,
+      isTask: isTask,
     );
     await _persist([...state.notes, created]);
     await NotificationService.instance.schedule(created);
@@ -249,7 +260,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
 
   Future<void> generate(String prompt) async {
     if (prompt.trim().isEmpty) return;
-    state = state.copyWith(generating: true);
+    state = state.copyWith(generating: true, generatedPlans: []);
     try {
       final plans = await _ai.generate(config: state.config, prompt: prompt);
       state = state.copyWith(generatedPlans: plans, generating: false);
@@ -268,3 +279,13 @@ class SmartNoteController extends Notifier<SmartNoteState> {
 final smartNoteProvider = NotifierProvider<SmartNoteController, SmartNoteState>(
   SmartNoteController.new,
 );
+
+int _compareRecentFirst(NoteModel a, NoteModel b) {
+  final now = DateTime.now();
+  final aTime = a.reminderAt ?? a.createdAt;
+  final bTime = b.reminderAt ?? b.createdAt;
+  final aFuture = !aTime.isBefore(now);
+  final bFuture = !bTime.isBefore(now);
+  if (aFuture != bFuture) return aFuture ? -1 : 1;
+  return aFuture ? aTime.compareTo(bTime) : bTime.compareTo(aTime);
+}

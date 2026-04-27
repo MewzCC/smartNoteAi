@@ -1,17 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/copy_utils.dart';
 import '../../../core/utils/toast_utils.dart';
-import '../../../core/widgets/sticky_app_bar.dart';
 import '../../../core/widgets/sticky_input.dart';
-import '../../../core/widgets/sticky_tag.dart';
 import '../../../features/home/provider/home_provider.dart';
 import '../../../shared/components/paper_background.dart';
+import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
+import '../pages/note_preview_page.dart';
+import '../pages/note_reminder_page.dart';
+import '../widgets/note_ai_write_panel.dart';
+import '../widgets/note_checklist_editor.dart';
+import '../widgets/note_color_selector.dart';
+import '../widgets/note_editor_header.dart';
+import '../widgets/note_more_panel.dart';
+import '../widgets/note_paper_editor.dart';
+import '../widgets/note_reminder_selector.dart';
+import '../widgets/note_tag_selector.dart';
+import '../widgets/note_toolbar.dart';
 
 class NoteEditorPage extends ConsumerStatefulWidget {
   const NoteEditorPage({super.key, this.noteId, this.initialIsTask = false});
@@ -27,10 +38,18 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
   late final TextEditingController _title;
   late final TextEditingController _content;
   late final TextEditingController _newTag;
+  late final TextEditingController _aiPrompt;
+  Timer? _autoSaveTimer;
   DateTime? _reminderAt;
   NotePriority _priority = NotePriority.medium;
+  NoteColor _paperColor = NoteColor.yellow;
   String _tag = '全部';
   bool _isTask = false;
+  bool _done = false;
+  bool _isPinned = false;
+  final bool _autoFocusContent = false;
+
+  bool get _editing => widget.noteId != null;
 
   @override
   void initState() {
@@ -45,26 +64,34 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     _title = TextEditingController(text: note?.title ?? '');
     _content = TextEditingController(text: note?.content ?? '');
     _newTag = TextEditingController();
+    _aiPrompt = TextEditingController();
     _reminderAt = note?.reminderAt;
     _priority = note?.priority ?? NotePriority.medium;
+    _paperColor = note?.paperColor ?? noteColorFromPriority(_priority);
     _tag = note?.tag ?? '全部';
     _isTask = note?.isTask ?? widget.initialIsTask;
+    _done = note?.done ?? false;
+    _isPinned = note?.isPinned ?? false;
+    _title.addListener(_scheduleAutoSave);
+    _content.addListener(_scheduleAutoSave);
   }
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
     _title.dispose();
     _content.dispose();
     _newTag.dispose();
+    _aiPrompt.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final editing = widget.noteId != null;
+    final state = ref.watch(smartNoteProvider);
     final tags = <String>{
-      ...ref.watch(smartNoteProvider).config.customTags,
-      ...ref.watch(smartNoteProvider).notes.map((note) => note.tag),
+      ...state.config.customTags,
+      ...state.notes.map((note) => note.tag),
     }.where((tag) => tag.trim().isNotEmpty).toList();
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -74,99 +101,83 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
             constraints: const BoxConstraints(maxWidth: 430),
             child: SafeArea(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
                 children: [
-                  StickyAppBar(
-                    title: editing ? '编辑笔记' : '新增笔记',
-                    showBack: true,
-                    showSearch: false,
-                    trailing: TextButton(
-                      onPressed: _save,
-                      child: const Text('完成'),
-                    ),
+                  NoteEditorHeader(
+                    title: _editing ? '编辑便签' : '新建便签',
+                    showBack: _editing,
+                    onCancel: () => context.pop(),
+                    onDone: _saveAndClose,
                   ),
-                  TextField(
-                    controller: _title,
-                    decoration: const InputDecoration(
-                      hintText: '标题（可选）',
-                      filled: false,
-                      border: InputBorder.none,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    height: 220,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.noteYellow,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: TextField(
-                      controller: _content,
-                      expands: true,
-                      maxLines: null,
-                      decoration: const InputDecoration(
-                        hintText: '开始记录你的想法...',
-                        filled: false,
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 10,
-                    children: [
-                      for (final item in NotePriority.values)
-                        ChoiceChip(
-                          selected: item == _priority,
-                          label: Text('${item.label}优先级'),
-                          onSelected: (_) => setState(() => _priority = item),
-                        ),
-                    ],
+                  NotePaperEditor(
+                    titleController: _title,
+                    contentController: _content,
+                    paperColor: _paperColor,
+                    isPinned: _isPinned,
+                    autoFocusContent: _autoFocusContent,
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      for (final tag in tags)
-                        StickyTag(
-                          label: tag,
-                          selected: tag == _tag,
-                          onTap: () => setState(() => _tag = tag),
-                        ),
-                      ActionChip(
-                        avatar: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('新建标签'),
-                        onPressed: _createTag,
-                      ),
-                    ],
+                  NoteToolbar(
+                    onTemplate: _insertTemplate,
+                    onAiWrite: _openAiPanel,
+                    onChecklist: _openChecklistPanel,
+                    onImage: () => ToastUtils.show('图片功能将在后续版本开放'),
+                    onVoice: () => ToastUtils.show('语音输入将在后续版本开放'),
+                    onMore: _openMorePanel,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
+                  NoteColorSelector(
+                    selected: _paperColor,
+                    onChanged: (value) {
+                      setState(() => _paperColor = value);
+                      _scheduleAutoSave();
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  NoteTagSelector(
+                    tags: tags,
+                    selected: _tag,
+                    onChanged: (value) {
+                      setState(() => _tag = value);
+                      _scheduleAutoSave();
+                    },
+                    onCreate: _createTag,
+                  ),
+                  const SizedBox(height: 22),
+                  NoteReminderSelector(
+                    reminderAt: _reminderAt,
+                    onTap: _openReminderPage,
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('是否置顶'),
+                    value: _isPinned,
+                    onChanged: (value) {
+                      setState(() => _isPinned = value);
+                      _scheduleAutoSave();
+                    },
+                  ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('加入任务'),
-                    subtitle: const Text('开启后才会出现在任务页'),
+                    subtitle: const Text('开启后会显示在任务页'),
                     value: _isTask,
-                    onChanged: (value) => setState(() => _isTask = value),
+                    onChanged: (value) {
+                      setState(() => _isTask = value);
+                      _scheduleAutoSave();
+                    },
                   ),
-                  const SizedBox(height: 4),
-                  ListTile(
-                    leading: const Icon(Icons.alarm_rounded),
-                    title: Text(
-                      _reminderAt == null
-                          ? '设置提醒时间'
-                          : formatFullTime(_reminderAt!),
+                  if (_isTask)
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('完成状态'),
+                      subtitle: const Text('已完成会置灰并显示删除线'),
+                      value: _done,
+                      onChanged: (value) {
+                        setState(() => _done = value);
+                        _scheduleAutoSave();
+                      },
                     ),
-                    subtitle: Text(
-                      _reminderAt == null
-                          ? '请选择具体日期和当天时间'
-                          : '已选择具体提醒时间，保存后会创建系统提醒',
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: _pickReminder,
-                  ),
                 ],
               ),
             ),
@@ -176,131 +187,17 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     );
   }
 
-  Future<void> _pickReminder() async {
-    var draft = _reminderAt ?? DateTime.now().add(const Duration(hours: 1));
-    await showMaterialModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: StatefulBuilder(
-            builder: (context, setSheetState) => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '选择提醒时间',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.noteYellow.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text('当前选择'),
-                      const SizedBox(height: 6),
-                      Text(
-                        formatFullTime(draft),
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: draft.isAfter(now)
-                                ? draft
-                                : now.add(const Duration(days: 1)),
-                            firstDate: now,
-                            lastDate: now.add(const Duration(days: 365)),
-                            locale: const Locale('zh', 'CN'),
-                          );
-                          if (date == null) return;
-                          setSheetState(() {
-                            draft = DateTime(
-                              date.year,
-                              date.month,
-                              date.day,
-                              draft.hour,
-                              draft.minute,
-                            );
-                          });
-                        },
-                        icon: const Icon(Icons.calendar_month_rounded),
-                        label: const Text('选择日期'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final now = DateTime.now();
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.fromDateTime(draft),
-                          );
-                          if (time == null) return;
-                          final next = DateTime(
-                            draft.year,
-                            draft.month,
-                            draft.day,
-                            time.hour,
-                            time.minute,
-                          );
-                          setSheetState(() {
-                            draft = next.isAfter(now)
-                                ? next
-                                : now.add(const Duration(hours: 1));
-                          });
-                        },
-                        icon: const Icon(Icons.schedule_rounded),
-                        label: const Text('选择时间'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () {
-                    if (!draft.isAfter(DateTime.now())) {
-                      ToastUtils.show('请选择未来时间');
-                      return;
-                    }
-                    setState(() {
-                      _reminderAt = draft;
-                    });
-                    Navigator.pop(sheetContext);
-                  },
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('确定提醒时间'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() => _reminderAt = null);
-                    Navigator.pop(sheetContext);
-                  },
-                  child: const Text('清除提醒'),
-                ),
-              ],
-            ),
-          ),
-        ),
+  Future<void> _openReminderPage() async {
+    final result = await Navigator.of(context).push<NoteReminderResult>(
+      MaterialPageRoute(
+        builder: (context) => NoteReminderPage(initialTime: _reminderAt),
       ),
     );
+    if (result == null || !mounted) return;
+    setState(() {
+      _reminderAt = result.enabled ? result.time : null;
+    });
+    _scheduleAutoSave();
   }
 
   Future<void> _createTag() async {
@@ -325,9 +222,173 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     if (value == null || value.isEmpty) return;
     await ref.read(smartNoteProvider.notifier).addCustomTag(value);
     setState(() => _tag = value);
+    _scheduleAutoSave();
   }
 
-  Future<void> _save() async {
+  void _insertTemplate() {
+    final next = ['一、目标', '二、执行步骤', '三、注意事项', '四、完成标准'].join('\n');
+    _appendContent(next);
+  }
+
+  void _openChecklistPanel() {
+    showMaterialModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => NoteChecklistEditor(
+        onInsertChecklist: () {
+          Navigator.pop(sheetContext);
+          _appendContent('- [ ] 任务一\n- [ ] 任务二\n- [ ] 任务三');
+        },
+        onAppendTodo: () {
+          Navigator.pop(sheetContext);
+          _appendContent('- [ ] ');
+        },
+      ),
+    );
+  }
+
+  void _openAiPanel() {
+    _aiPrompt.text = _title.text.trim().isEmpty
+        ? _content.text.trim()
+        : _title.text.trim();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+        ),
+        child: Center(
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: NoteAiWritePanel(
+                controller: _aiPrompt,
+                onGenerate: () async {
+                  try {
+                    await ref
+                        .read(smartNoteProvider.notifier)
+                        .generate(_aiPrompt.text);
+                    final plans = ref.read(smartNoteProvider).generatedPlans;
+                    if (plans.isNotEmpty) {
+                      final first = plans.first;
+                      if (_title.text.trim().isEmpty) _title.text = first.title;
+                      _appendContent(first.content);
+                    }
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  } catch (_) {
+                    ToastUtils.show('AI 生成失败，请检查服务商配置');
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openMorePanel() {
+    showMaterialModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => NoteMorePanel(
+          isPinned: _isPinned,
+          isTask: _isTask,
+          done: _done,
+          onPinChanged: (value) {
+            setState(() => _isPinned = value);
+            setSheetState(() {});
+            _scheduleAutoSave();
+          },
+          onTaskChanged: (value) {
+            setState(() => _isTask = value);
+            setSheetState(() {});
+            _scheduleAutoSave();
+          },
+          onDoneChanged: (value) {
+            setState(() => _done = value);
+            setSheetState(() {});
+            _scheduleAutoSave();
+          },
+          onCopy: () async {
+            await CopyUtils.copy('${_title.text}\n\n${_content.text}');
+            ToastUtils.show('已复制便签内容');
+          },
+          onPreview: () {
+            Navigator.pop(sheetContext);
+            _openPreview();
+          },
+          onArchive: () async {
+            if (!_editing) {
+              ToastUtils.show('保存后可归档');
+              return;
+            }
+            await ref
+                .read(smartNoteProvider.notifier)
+                .toggleArchive(widget.noteId!);
+            if (!mounted) return;
+            Navigator.of(this.context).pop();
+          },
+          onDelete: () async {
+            if (!_editing) {
+              Navigator.pop(sheetContext);
+              return;
+            }
+            await ref
+                .read(smartNoteProvider.notifier)
+                .deleteNote(widget.noteId!);
+            if (!mounted) return;
+            Navigator.of(this.context).pop();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openPreview() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => NotePreviewPage(
+          title: _title.text.trim(),
+          content: _content.text.trim(),
+          priority: _priority,
+          paperColor: _paperColor,
+          tag: _tag,
+          isPinned: _isPinned,
+          reminderAt: _reminderAt,
+        ),
+      ),
+    );
+  }
+
+  void _appendContent(String value) {
+    final current = _content.text.trimRight();
+    final prefix = current.isEmpty ? '' : '\n';
+    _content.text = '$current$prefix$value';
+    _content.selection = TextSelection.collapsed(offset: _content.text.length);
+    _scheduleAutoSave();
+  }
+
+  void _scheduleAutoSave() {
+    if (!_editing) return;
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(milliseconds: 900), () {
+      _save(closeAfterSave: false, showToast: false);
+    });
+  }
+
+  Future<void> _saveAndClose() => _save(closeAfterSave: true, showToast: true);
+
+  Future<void> _save({
+    required bool closeAfterSave,
+    required bool showToast,
+  }) async {
     final title = _title.text.trim().isEmpty ? '未命名笔记' : _title.text.trim();
     final content = _content.text.trim();
     if (content.isEmpty) {
@@ -348,8 +409,11 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         content: content,
         reminderAt: _reminderAt,
         priority: _priority,
+        paperColor: _paperColor,
         tag: _tag,
         isTask: _isTask,
+        done: _isTask && _done,
+        isPinned: _isPinned,
       );
     } else {
       await controller.updateNote(
@@ -359,11 +423,15 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           reminderAt: _reminderAt,
           clearReminder: _reminderAt == null,
           priority: _priority,
+          paperColor: _paperColor,
           tag: _tag,
           isTask: _isTask,
+          done: _isTask && _done,
+          isPinned: _isPinned,
         ),
       );
     }
-    if (mounted) context.pop();
+    if (showToast) ToastUtils.show('已保存');
+    if (mounted && closeAfterSave) context.pop();
   }
 }

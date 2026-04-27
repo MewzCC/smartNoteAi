@@ -7,7 +7,7 @@ import '../../../core/utils/date_utils.dart';
 import '../../../core/widgets/sticky_app_bar.dart';
 import '../../../shared/components/app_scaffold.dart';
 import '../../../shared/components/empty_state.dart';
-import '../../../shared/enums/note_priority.dart';
+import '../../../shared/enums/note_color.dart';
 import '../provider/profile_provider.dart';
 
 class TrashPage extends ConsumerWidget {
@@ -73,7 +73,7 @@ class _TrashItem extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: note.priority.color,
+        color: note.paperColor.color,
         borderRadius: BorderRadius.circular(14),
         boxShadow: AppShadows.card,
       ),

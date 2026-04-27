@@ -1,3 +1,4 @@
+import '../../shared/enums/note_color.dart';
 import '../../shared/enums/note_priority.dart';
 
 class NoteModel {
@@ -9,6 +10,7 @@ class NoteModel {
     this.reminderAt,
     this.done = false,
     this.priority = NotePriority.medium,
+    this.paperColor = NoteColor.yellow,
     this.isTask = false,
     this.isPinned = false,
     this.isArchived = false,
@@ -24,6 +26,7 @@ class NoteModel {
   final DateTime? reminderAt;
   final bool done;
   final NotePriority priority;
+  final NoteColor paperColor;
   final bool isTask;
   final bool isPinned;
   final bool isArchived;
@@ -38,6 +41,7 @@ class NoteModel {
     bool clearReminder = false,
     bool? done,
     NotePriority? priority,
+    NoteColor? paperColor,
     bool? isTask,
     bool? isPinned,
     bool? isArchived,
@@ -54,6 +58,7 @@ class NoteModel {
       reminderAt: clearReminder ? null : reminderAt ?? this.reminderAt,
       done: done ?? this.done,
       priority: priority ?? this.priority,
+      paperColor: paperColor ?? this.paperColor,
       isTask: isTask ?? this.isTask,
       isPinned: isPinned ?? this.isPinned,
       isArchived: isArchived ?? this.isArchived,
@@ -71,6 +76,7 @@ class NoteModel {
     'reminderAt': reminderAt?.toIso8601String(),
     'done': done,
     'priority': priority.name,
+    'paperColor': paperColor.name,
     'isTask': isTask,
     'isPinned': isPinned,
     'isArchived': isArchived,
@@ -80,6 +86,10 @@ class NoteModel {
   };
 
   factory NoteModel.fromJson(Map<String, dynamic> json) {
+    final priority = NotePriority.values.firstWhere(
+      (item) => item.name == json['priority'],
+      orElse: () => NotePriority.medium,
+    );
     return NoteModel(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -89,9 +99,10 @@ class NoteModel {
           ? null
           : DateTime.parse(json['reminderAt'] as String),
       done: json['done'] as bool? ?? false,
-      priority: NotePriority.values.firstWhere(
-        (item) => item.name == json['priority'],
-        orElse: () => NotePriority.medium,
+      priority: priority,
+      paperColor: NoteColor.values.firstWhere(
+        (item) => item.name == json['paperColor'],
+        orElse: () => noteColorFromPriority(priority),
       ),
       isTask: json['isTask'] as bool? ?? false,
       isPinned: json['isPinned'] as bool? ?? false,

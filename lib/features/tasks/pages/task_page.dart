@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/date_utils.dart';
 import '../../../core/widgets/sticky_app_bar.dart';
 import '../../../core/widgets/sticky_tag.dart';
 import '../../../data/models/note_model.dart';
@@ -78,16 +79,33 @@ class _TaskPageState extends ConsumerState<TaskPage> {
                   height: 140,
                 ),
               )
-            else if (_filter == '已完成')
-              _TaskGroup(title: '已完成', notes: notes)
-            else ...[
-              _TaskGroup(title: '今天', notes: notes.take(2).toList()),
-              _TaskGroup(title: '本周', notes: notes.skip(2).take(2).toList()),
-              _TaskGroup(title: '本月', notes: notes.skip(4).toList()),
-            ],
+            else
+              _TaskSections(notes: notes),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TaskSections extends StatelessWidget {
+  const _TaskSections({required this.notes});
+
+  final List<NoteModel> notes;
+
+  @override
+  Widget build(BuildContext context) {
+    final buckets = _TaskBuckets.from(notes);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _TaskGroup(title: '今天', notes: buckets.today),
+        if (buckets.thisWeek.isNotEmpty)
+          _WeekTaskGroup(dayNotes: buckets.thisWeek),
+        for (final entry in buckets.otherDays.entries)
+          _TaskGroup(title: _dayTitle(entry.key), notes: entry.value),
+        _TaskGroup(title: '未设置日期', notes: buckets.noDate),
+      ],
     );
   }
 }
@@ -113,6 +131,64 @@ class _TaskTags extends StatelessWidget {
         ),
         separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemCount: tags.length,
+      ),
+    );
+  }
+}
+
+class _WeekTaskGroup extends StatelessWidget {
+  const _WeekTaskGroup({required this.dayNotes});
+
+  final Map<DateTime, List<NoteModel>> dayNotes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          initiallyExpanded: true,
+          title: const Text(
+            '本周',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          children: [
+            for (final entry in dayNotes.entries)
+              _TaskDayBlock(title: _dayTitle(entry.key), notes: entry.value),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskDayBlock extends StatelessWidget {
+  const _TaskDayBlock({required this.title, required this.notes});
+
+  final String title;
+  final List<NoteModel> notes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final note in notes) _TaskTile(note: note),
+        ],
       ),
     );
   }
@@ -183,14 +259,13 @@ class _TaskTile extends ConsumerWidget {
                 ),
               ),
             ),
-            if (note.reminderAt != null)
-              Text(
-                '${note.reminderAt!.hour.toString().padLeft(2, '0')}:${note.reminderAt!.minute.toString().padLeft(2, '0')}',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                ),
+            Text(
+              _formatTaskTime(note.reminderAt),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
               ),
+            ),
             if (!note.done) ...[
               const SizedBox(width: 8),
               IconButton(
@@ -210,4 +285,81 @@ class _TaskTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _TaskBuckets {
+  const _TaskBuckets({
+    required this.today,
+    required this.thisWeek,
+    required this.otherDays,
+    required this.noDate,
+  });
+
+  final List<NoteModel> today;
+  final Map<DateTime, List<NoteModel>> thisWeek;
+  final Map<DateTime, List<NoteModel>> otherDays;
+  final List<NoteModel> noDate;
+
+  factory _TaskBuckets.from(List<NoteModel> notes) {
+    final today = dateOnly(DateTime.now());
+    final weekStart = today.subtract(Duration(days: today.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final sorted = [...notes]..sort(_compareTask);
+    final todayNotes = <NoteModel>[];
+    final thisWeek = <DateTime, List<NoteModel>>{};
+    final otherDays = <DateTime, List<NoteModel>>{};
+    final noDate = <NoteModel>[];
+
+    for (final note in sorted) {
+      final reminder = note.reminderAt;
+      if (reminder == null) {
+        noDate.add(note);
+        continue;
+      }
+      final day = dateOnly(reminder);
+      if (day.isAtSameMomentAs(today)) {
+        todayNotes.add(note);
+      } else if (!day.isBefore(weekStart) && day.isBefore(weekEnd)) {
+        thisWeek.putIfAbsent(day, () => <NoteModel>[]).add(note);
+      } else {
+        otherDays.putIfAbsent(day, () => <NoteModel>[]).add(note);
+      }
+    }
+
+    return _TaskBuckets(
+      today: todayNotes,
+      thisWeek: thisWeek,
+      otherDays: otherDays,
+      noDate: noDate,
+    );
+  }
+}
+
+int _compareTask(NoteModel a, NoteModel b) {
+  final aTime = a.reminderAt ?? a.createdAt;
+  final bTime = b.reminderAt ?? b.createdAt;
+  return aTime.compareTo(bTime);
+}
+
+String _formatTaskTime(DateTime? value) {
+  if (value == null) return '未设置';
+  final today = dateOnly(DateTime.now());
+  final day = dateOnly(value);
+  final time =
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  if (day.isAtSameMomentAs(today)) return time;
+  return '${value.month}月${value.day}日 $time';
+}
+
+String _dayTitle(DateTime value) {
+  final today = dateOnly(DateTime.now());
+  final day = dateOnly(value);
+  if (day.isAtSameMomentAs(today)) return '今天';
+  if (day.isAtSameMomentAs(today.add(const Duration(days: 1)))) return '明天';
+  return '${value.month}月${value.day}日 ${_weekdayText(value)}';
+}
+
+String _weekdayText(DateTime value) {
+  const labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  return labels[value.weekday - 1];
 }

@@ -1,6 +1,8 @@
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../data/models/note_model.dart';
@@ -16,9 +18,11 @@ class NotificationService {
   static final instance = NotificationService._();
 
   final _plugin = FlutterLocalNotificationsPlugin();
+  bool _ready = false;
 
   Future<void> init() async {
     if (kIsWeb) return;
+    await _initTimezone();
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings();
     await _plugin.initialize(
@@ -33,6 +37,16 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await android?.requestNotificationsPermission();
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'smart_note_ai_reminders',
+        '智能便签提醒',
+        description: '便签闹钟和系统提醒',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+      ),
+    );
     final canScheduleExact = await android?.canScheduleExactNotifications();
     if (canScheduleExact == false) {
       await android?.requestExactAlarmsPermission();
@@ -43,15 +57,16 @@ class NotificationService {
           IOSFlutterLocalNotificationsPlugin
         >()
         ?.requestPermissions(alert: true, badge: true, sound: true);
+    _ready = true;
   }
 
-  Future<void> schedule(NoteModel note) async {
-    if (kIsWeb ||
-        note.reminderAt == null ||
-        note.reminderAt!.isBefore(DateTime.now())) {
+  Future<void> schedule(NoteModel note, {bool createSystemAlarm = true}) async {
+    if (kIsWeb) return;
+    if (!_ready) await init();
+    await cancel(note.id);
+    if (note.reminderAt == null || !note.reminderAt!.isAfter(DateTime.now())) {
       return;
     }
-    await cancel(note.id);
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
         'smart_note_ai_reminders',
@@ -61,36 +76,57 @@ class NotificationService {
         priority: Priority.max,
         playSound: true,
         enableVibration: true,
+        category: AndroidNotificationCategory.alarm,
+        visibility: NotificationVisibility.public,
+        fullScreenIntent: true,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
       ),
       iOS: DarwinNotificationDetails(presentSound: true),
     );
 
-    try {
-      await _plugin.zonedSchedule(
-        id: _intId(note.id),
-        title: note.title,
-        body: note.content,
-        scheduledDate: tz.TZDateTime.from(note.reminderAt!, tz.local),
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.alarmClock,
-      );
-    } catch (_) {
-      await _plugin.zonedSchedule(
-        id: _intId(note.id),
-        title: note.title,
-        body: note.content,
-        scheduledDate: tz.TZDateTime.from(note.reminderAt!, tz.local),
-        notificationDetails: details,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      );
-    }
+    await _scheduleWithFallback(note, details);
 
-    await _tryNativeAlarm(note);
+    if (createSystemAlarm) {
+      await _tryNativeAlarm(note);
+    }
   }
 
   Future<void> cancel(String noteId) {
     if (kIsWeb) return Future<void>.value();
     return _plugin.cancel(id: _intId(noteId));
+  }
+
+  Future<void> reschedulePending(List<NoteModel> notes) async {
+    if (kIsWeb) return;
+    for (final note in notes) {
+      if (note.reminderAt != null && note.reminderAt!.isAfter(DateTime.now())) {
+        await schedule(note, createSystemAlarm: false);
+      }
+    }
+  }
+
+  Future<void> _scheduleWithFallback(
+    NoteModel note,
+    NotificationDetails details,
+  ) async {
+    final date = tz.TZDateTime.from(note.reminderAt!, tz.local);
+    for (final mode in const [
+      AndroidScheduleMode.alarmClock,
+      AndroidScheduleMode.exactAllowWhileIdle,
+      AndroidScheduleMode.inexactAllowWhileIdle,
+    ]) {
+      try {
+        await _plugin.zonedSchedule(
+          id: _intId(note.id),
+          title: note.title,
+          body: note.content,
+          scheduledDate: date,
+          notificationDetails: details,
+          androidScheduleMode: mode,
+        );
+        return;
+      } catch (_) {}
+    }
   }
 
   Future<void> _tryNativeAlarm(NoteModel note) async {
@@ -103,7 +139,7 @@ class NotificationService {
         'android.intent.extra.alarm.MINUTES': time.minute,
         'android.intent.extra.alarm.MESSAGE': 'AI 智能便签：${note.title}',
         'android.intent.extra.alarm.VIBRATE': true,
-        'android.intent.extra.alarm.SKIP_UI': false,
+        'android.intent.extra.alarm.SKIP_UI': true,
       },
     );
     try {
@@ -119,4 +155,14 @@ class NotificationService {
 
   int _intId(String id) =>
       id.codeUnits.fold(0, (sum, unit) => (sum + unit * 31) % 2147483647);
+
+  Future<void> _initTimezone() async {
+    tz_data.initializeTimeZones();
+    try {
+      final timezone = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(timezone.identifier));
+    } catch (_) {
+      tz.setLocalLocation(tz.local);
+    }
+  }
 }

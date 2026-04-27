@@ -13,11 +13,16 @@ class StickyBottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = [
-      _NavSpec(Icons.home_rounded, '首页', '/home'),
-      _NavSpec(Icons.edit_note_rounded, '笔记', '/notes'),
-      _NavSpec(Icons.smart_toy_rounded, 'AI便签', '/ai'),
-      _NavSpec(Icons.check_box_outlined, '任务', '/tasks'),
-      _NavSpec(Icons.calendar_month_rounded, '日历', '/calendar'),
+      const _NavSpec(Icons.home_rounded, '首页', '/home'),
+      const _NavSpec(Icons.edit_note_rounded, '笔记', '/notes'),
+      const _NavSpec(
+        Icons.smart_toy_rounded,
+        'AI便签',
+        '/ai',
+        'assets/icon/ai_bot.png',
+      ),
+      const _NavSpec(Icons.check_box_outlined, '任务', '/tasks'),
+      const _NavSpec(Icons.calendar_month_rounded, '日历', '/calendar'),
     ];
     return Container(
       height: 74,
@@ -44,11 +49,12 @@ class StickyBottomNav extends StatelessWidget {
 }
 
 class _NavSpec {
-  const _NavSpec(this.icon, this.label, this.path);
+  const _NavSpec(this.icon, this.label, this.path, [this.asset]);
 
   final IconData icon;
   final String label;
   final String path;
+  final String? asset;
 }
 
 class _NavItem extends StatelessWidget {
@@ -80,7 +86,17 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(spec.icon, size: 24),
+            if (spec.asset == null)
+              Icon(spec.icon, size: 24)
+            else
+              ClipOval(
+                child: Image.asset(
+                  spec.asset!,
+                  width: 26,
+                  height: 26,
+                  fit: BoxFit.cover,
+                ),
+              ),
             const SizedBox(height: 3),
             Text(
               spec.label,

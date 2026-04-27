@@ -1,9 +1,8 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 
 import '../../data/local/hive_database.dart';
+import '../../data/repositories/note_repository.dart';
 import '../utils/device_utils.dart';
 
 class AppBootstrap {
@@ -21,8 +20,9 @@ class AppBootstrap {
     await initializeDateFormatting('zh_CN');
     await Hive.initFlutter();
     await HiveDatabase.open();
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Shanghai'));
     await NotificationService.instance.init();
+    await NotificationService.instance.reschedulePending(
+      NoteRepository().loadNotes(),
+    );
   }
 }
