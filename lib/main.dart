@@ -538,16 +538,27 @@ class NotificationService {
   Future<void> init() async {
     if (kIsWeb) return;
 
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
     await _plugin.initialize(
-      settings: const InitializationSettings(android: android, iOS: ios),
+      settings: const InitializationSettings(android: androidInit, iOS: ios),
     );
     await _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.requestNotificationsPermission();
+    final androidNotifications = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (androidNotifications != null) {
+      final canScheduleExact = await androidNotifications
+          .canScheduleExactNotifications();
+      if (canScheduleExact == false) {
+        await androidNotifications.requestExactAlarmsPermission();
+      }
+    }
     await _plugin
         .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
@@ -575,14 +586,25 @@ class NotificationService {
       iOS: DarwinNotificationDetails(presentSound: true),
     );
 
-    await _plugin.zonedSchedule(
-      id: _intId(note.id),
-      title: note.title,
-      body: note.content,
-      scheduledDate: tz.TZDateTime.from(reminder, tz.local),
-      notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    );
+    try {
+      await _plugin.zonedSchedule(
+        id: _intId(note.id),
+        title: note.title,
+        body: note.content,
+        scheduledDate: tz.TZDateTime.from(reminder, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
+      );
+    } catch (_) {
+      await _plugin.zonedSchedule(
+        id: _intId(note.id),
+        title: note.title,
+        body: note.content,
+        scheduledDate: tz.TZDateTime.from(reminder, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      );
+    }
 
     await _tryNativeAlarm(note);
   }
@@ -605,12 +627,19 @@ class NotificationService {
         'android.intent.extra.alarm.HOUR': time.hour,
         'android.intent.extra.alarm.MINUTES': time.minute,
         'android.intent.extra.alarm.MESSAGE': '智能便签：${note.title}',
-        'android.intent.extra.alarm.SKIP_UI': true,
+        'android.intent.extra.alarm.VIBRATE': true,
+        'android.intent.extra.alarm.SKIP_UI': false,
       },
     );
     try {
       await intent.launch();
-    } catch (_) {}
+    } catch (_) {
+      try {
+        await const AndroidIntent(
+          action: 'android.intent.action.SHOW_ALARMS',
+        ).launch();
+      } catch (_) {}
+    }
   }
 
   int _intId(String id) =>
@@ -943,39 +972,47 @@ class MobileHomePage extends StatelessWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 22),
-            sliver: SliverGrid(
-              delegate: SliverChildBuilderDelegate((context, index) {
-                final note = wallNotes[index];
-                return Dismissible(
-                  key: ValueKey('home-${note.id}'),
-                  direction: DismissDirection.endToStart,
-                  dismissThresholds: const {DismissDirection.endToStart: 0.2},
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE86C52),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.delete_rounded,
-                      color: Colors.white,
-                    ),
+            sliver: SliverLayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = (constraints.crossAxisExtent - 16) / 2;
+                final cardHeight = (cardWidth * 0.78).clamp(118.0, 148.0);
+                return SliverGrid(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final note = wallNotes[index];
+                    final isPreview = note.id.startsWith('preview-');
+                    return Dismissible(
+                      key: ValueKey('home-${note.id}'),
+                      direction: isPreview
+                          ? DismissDirection.none
+                          : DismissDirection.endToStart,
+                      dismissThresholds: const {
+                        DismissDirection.endToStart: 0.2,
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE86C52),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.delete_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                      onDismissed: (_) =>
+                          context.read<AppStore>().deleteNote(note.id),
+                      child: StickyWallCard(note: note),
+                    );
+                  }, childCount: wallNotes.length),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    mainAxisExtent: cardHeight,
                   ),
-                  onDismissed: (_) {
-                    if (!note.id.startsWith('preview-')) {
-                      context.read<AppStore>().deleteNote(note.id);
-                    }
-                  },
-                  child: StickyWallCard(note: note),
                 );
-              }, childCount: wallNotes.length),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 1.35,
-              ),
+              },
             ),
           ),
           SliverToBoxAdapter(
@@ -1054,65 +1091,46 @@ class HomeTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(22, 12, 22, 18),
+      child: Row(
         children: [
-          const Row(
-            children: [
-              Text(
-                '9:41',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-              ),
-              Spacer(),
-              Icon(Icons.signal_cellular_alt_rounded, size: 18),
-              SizedBox(width: 6),
-              Icon(Icons.wifi_rounded, size: 18),
-              SizedBox(width: 6),
-              Icon(Icons.battery_full_rounded, size: 22),
-            ],
+          IconButton(
+            tooltip: '菜单',
+            onPressed: onMenu,
+            icon: const Icon(Icons.menu_rounded, size: 32),
           ),
-          const SizedBox(height: 28),
-          Row(
-            children: [
-              IconButton(
-                tooltip: '菜单',
-                onPressed: onMenu,
-                icon: const Icon(Icons.menu_rounded, size: 32),
-              ),
-              const Spacer(),
-              const Text(
-                '首页',
-                style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: '搜索',
-                onPressed: () {},
-                icon: const Icon(Icons.search_rounded, size: 34),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onProfile,
-                child: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDDF0FF),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: AppColors.cardShadow,
-                        blurRadius: 10,
-                        offset: Offset(0, 5),
-                      ),
-                    ],
+          const Spacer(),
+          const Text(
+            '首页',
+            style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: '搜索',
+            onPressed: () {},
+            icon: const Icon(Icons.search_rounded, size: 34),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onProfile,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDDF0FF),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 3),
+                boxShadow: const [
+                  BoxShadow(
+                    color: AppColors.cardShadow,
+                    blurRadius: 10,
+                    offset: Offset(0, 5),
                   ),
-                  alignment: Alignment.center,
-                  child: const Text('👩🏻', style: TextStyle(fontSize: 25)),
-                ),
+                ],
               ),
-            ],
+              alignment: Alignment.center,
+              child: const Text('👩🏻', style: TextStyle(fontSize: 25)),
+            ),
           ),
         ],
       ),
@@ -1128,8 +1146,8 @@ class WelcomeStickyCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
       child: Container(
-        height: 96,
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+        constraints: const BoxConstraints(minHeight: 104),
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFFFFF6B8), AppColors.yellow],
@@ -1160,7 +1178,7 @@ class WelcomeStickyCard extends StatelessWidget {
             ),
             Positioned(
               right: -18,
-              bottom: -15,
+              bottom: -20,
               child: Transform.rotate(
                 angle: -0.35,
                 child: Container(
@@ -1174,15 +1192,20 @@ class WelcomeStickyCard extends StatelessWidget {
               ),
             ),
             const Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '👋  你好，今天也要加油呀！',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                 ),
-                SizedBox(height: 13),
+                SizedBox(height: 12),
                 Text(
                   '专注当下，未来可期 ✨',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 15,
                     color: AppColors.textSecondary,
@@ -3396,7 +3419,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
                                 'yyyy/MM/dd HH:mm',
                               ).format(_reminderAt!),
                       ),
-                      subtitle: const Text('保存后注册本地通知，安卓会尝试调用原生闹钟'),
+                      subtitle: const Text('保存后注册系统提醒；安卓会打开系统闹钟确认界面'),
                       trailing: const Icon(Icons.chevron_right_rounded),
                       onTap: _pickReminder,
                     ),
