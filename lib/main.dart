@@ -771,32 +771,41 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [
-      NotesPage(),
-      ArchivePage(),
-      AchievementPage(),
-      AiPage(),
-      ProfilePage(),
+    final pages = [
+      MobileHomePage(
+        onNavigate: (index) => setState(() => _index = index),
+        onAdd: _openEditor,
+        onOpenAchievements: _openAchievements,
+        onOpenProfile: _openProfile,
+      ),
+      const NotesPage(),
+      const TaskPage(),
+      const ArchivePage(),
     ];
-    final titles = ['今日便签', '归档', '成就', '智能生成', '我的'];
+    final titles = ['首页', '笔记', '任务', '日历'];
     return Scaffold(
       extendBody: true,
-      appBar: AppBar(
-        title: Text(
-          titles[_index],
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: IconButton.filledTonal(
-              tooltip: '设置',
-              icon: const Icon(Icons.tune_rounded),
-              onPressed: () => setState(() => _index = 4),
+      appBar: _index == 0
+          ? null
+          : AppBar(
+              title: Text(
+                titles[_index],
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: IconButton.filledTonal(
+                    tooltip: '设置',
+                    icon: const Icon(Icons.tune_rounded),
+                    onPressed: _openProfile,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
       body: Stack(
         children: [
           const Positioned.fill(child: SoftBackground()),
@@ -811,75 +820,1268 @@ class _AppShellState extends State<AppShell> {
           ),
         ],
       ),
-      floatingActionButton: _index == 0
-          ? FloatingActionButton(
-              tooltip: '新建',
-              child: const Icon(Icons.add_rounded, size: 30),
-              onPressed: () async {
-                final note = await Navigator.of(context).push<Note>(
-                  MaterialPageRoute(builder: (_) => const NoteEditorPage()),
-                );
-                if (note != null && context.mounted) {
-                  await context.read<AppStore>().addNote(note);
-                }
-              },
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        child: Center(
-          heightFactor: 1,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 430),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(26),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: NavigationBar(
-                  height: 68,
-                  selectedIndex: _index,
-                  onDestinationSelected: (value) =>
-                      setState(() => _index = value),
-                  backgroundColor: const Color(
-                    0xFFFFFBF3,
-                  ).withValues(alpha: 0.88),
-                  indicatorColor: const Color(0xFFFFE88A),
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home_rounded),
-                      label: '首页',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.event_note_outlined),
-                      selectedIcon: Icon(Icons.event_note_rounded),
-                      label: '归档',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.star_border_rounded),
-                      selectedIcon: Icon(Icons.star_rounded),
-                      label: '成就',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.auto_awesome_outlined),
-                      selectedIcon: Icon(Icons.auto_awesome_rounded),
-                      label: '智能',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.person_outline_rounded),
-                      selectedIcon: Icon(Icons.person_rounded),
-                      label: '我的',
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      bottomNavigationBar: Center(
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 430),
+          child: StickyBottomNav(
+            selectedIndex: _index,
+            onChanged: (index) => setState(() => _index = index),
+            onAdd: _openEditor,
           ),
         ),
       ),
     );
   }
+
+  Future<void> _openEditor() async {
+    final note = await Navigator.of(
+      context,
+    ).push<Note>(MaterialPageRoute(builder: (_) => const NoteEditorPage()));
+    if (note != null && mounted) {
+      await context.read<AppStore>().addNote(note);
+    }
+  }
+
+  void _openProfile() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            const FeatureScaffold(title: '我的', child: ProfilePage()),
+      ),
+    );
+  }
+
+  void _openAchievements() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            const FeatureScaffold(title: '成就徽章', child: AchievementPage()),
+      ),
+    );
+  }
+}
+
+class FeatureScaffold extends StatelessWidget {
+  const FeatureScaffold({super.key, required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: SoftBackground()),
+          SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: child,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AppColors {
+  static const bg = Color(0xFFFFFCF4);
+  static const textPrimary = Color(0xFF222222);
+  static const textSecondary = Color(0xFF777777);
+  static const yellow = Color(0xFFFFEE88);
+  static const green = Color(0xFFB9E7A1);
+  static const pink = Color(0xFFFFB7C5);
+  static const blue = Color(0xFFB8D7FF);
+  static const purple = Color(0xFFE0CDFF);
+  static const cardShadow = Color(0x22000000);
+}
+
+class MobileHomePage extends StatelessWidget {
+  const MobileHomePage({
+    super.key,
+    required this.onNavigate,
+    required this.onAdd,
+    required this.onOpenAchievements,
+    required this.onOpenProfile,
+  });
+
+  final ValueChanged<int> onNavigate;
+  final VoidCallback onAdd;
+  final VoidCallback onOpenAchievements;
+  final VoidCallback onOpenProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<AppStore>();
+    final notes = store.notes;
+    final wallNotes = _homeWallNotes(notes);
+    final tasks = notes.take(3).toList();
+    return SafeArea(
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: HomeTopBar(onMenu: onOpenProfile, onProfile: onOpenProfile),
+          ),
+          const SliverToBoxAdapter(child: WelcomeStickyCard()),
+          SliverToBoxAdapter(
+            child: SectionHeader(title: '快捷记录', action: '全部', onTap: onAdd),
+          ),
+          SliverToBoxAdapter(child: QuickInput(onTap: onAdd)),
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: '便签墙',
+              action: '全部便签',
+              onTap: () => onNavigate(1),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            sliver: SliverGrid(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final note = wallNotes[index];
+                return Dismissible(
+                  key: ValueKey('home-${note.id}'),
+                  direction: DismissDirection.endToStart,
+                  dismissThresholds: const {DismissDirection.endToStart: 0.2},
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE86C52),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.delete_rounded,
+                      color: Colors.white,
+                    ),
+                  ),
+                  onDismissed: (_) {
+                    if (!note.id.startsWith('preview-')) {
+                      context.read<AppStore>().deleteNote(note.id);
+                    }
+                  },
+                  child: StickyWallCard(note: note),
+                );
+              }, childCount: wallNotes.length),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.35,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: '今日任务',
+              action: '全部任务',
+              onTap: () => onNavigate(2),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 11, child: TodayTasksCard(tasks: tasks)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 8,
+                    child: MiniCalendarCard(onTap: () => onNavigate(3)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SectionHeader(
+              title: '成就徽章',
+              action: '全部成就',
+              onTap: onOpenAchievements,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: AchievementShelf(
+              doneCount: store.doneCount,
+              streak: store.currentStreak,
+              activeDays: store.activeDays,
+              onTap: onOpenAchievements,
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 116)),
+        ],
+      ),
+    );
+  }
+
+  List<Note> _homeWallNotes(List<Note> notes) {
+    if (notes.length >= 4) return notes.take(4).toList();
+    final now = DateTime.now();
+    return [
+      ...notes,
+      Note(
+        id: 'preview-reading',
+        title: '阅读清单',
+        content: '《设计心理学》\n《简约至上》',
+        createdAt: now.subtract(const Duration(days: 1, hours: 2)),
+        priority: TaskPriority.high,
+      ),
+      Note(
+        id: 'preview-inspiration',
+        title: '灵感记录',
+        content: '卡片式布局\n便签风格 ✨',
+        createdAt: now.subtract(const Duration(days: 1, hours: 5)),
+        priority: TaskPriority.low,
+      ),
+    ].take(4).toList();
+  }
+}
+
+class HomeTopBar extends StatelessWidget {
+  const HomeTopBar({super.key, required this.onMenu, required this.onProfile});
+
+  final VoidCallback onMenu;
+  final VoidCallback onProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
+      child: Column(
+        children: [
+          const Row(
+            children: [
+              Text(
+                '9:41',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+              ),
+              Spacer(),
+              Icon(Icons.signal_cellular_alt_rounded, size: 18),
+              SizedBox(width: 6),
+              Icon(Icons.wifi_rounded, size: 18),
+              SizedBox(width: 6),
+              Icon(Icons.battery_full_rounded, size: 22),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              IconButton(
+                tooltip: '菜单',
+                onPressed: onMenu,
+                icon: const Icon(Icons.menu_rounded, size: 32),
+              ),
+              const Spacer(),
+              const Text(
+                '首页',
+                style: TextStyle(fontSize: 29, fontWeight: FontWeight.w900),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: '搜索',
+                onPressed: () {},
+                icon: const Icon(Icons.search_rounded, size: 34),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: onProfile,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDDF0FF),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: AppColors.cardShadow,
+                        blurRadius: 10,
+                        offset: Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('👩🏻', style: TextStyle(fontSize: 25)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class WelcomeStickyCard extends StatelessWidget {
+  const WelcomeStickyCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+      child: Container(
+        height: 96,
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFF6B8), AppColors.yellow],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFFDD68)),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.cardShadow,
+              blurRadius: 14,
+              offset: Offset(0, 7),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Positioned(
+              right: -12,
+              top: -24,
+              child: Icon(
+                Icons.star_rounded,
+                color: Color(0xFFFFC928),
+                size: 33,
+              ),
+            ),
+            Positioned(
+              right: -18,
+              bottom: -15,
+              child: Transform.rotate(
+                angle: -0.35,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD85A).withValues(alpha: 0.42),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '👋  你好，今天也要加油呀！',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+                SizedBox(height: 13),
+                Text(
+                  '专注当下，未来可期 ✨',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SectionHeader extends StatelessWidget {
+  const SectionHeader({
+    super.key,
+    required this.title,
+    required this.action,
+    required this.onTap,
+  });
+
+  final String title;
+  final String action;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 6, 22, 14),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
+          ),
+          const Spacer(),
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: [
+                  Text(
+                    action,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  const Icon(Icons.chevron_right_rounded, size: 20),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class QuickInput extends StatelessWidget {
+  const QuickInput({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 26),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.yellow.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFFFFD85A).withValues(alpha: 0.5),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.cardShadow,
+                blurRadius: 12,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '记录一下你的想法...',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFDA55).withValues(alpha: 0.38),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.add_rounded, size: 24),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class StickyWallCard extends StatefulWidget {
+  const StickyWallCard({super.key, required this.note});
+
+  final Note note;
+
+  @override
+  State<StickyWallCard> createState() => _StickyWallCardState();
+}
+
+class _StickyWallCardState extends State<StickyWallCard> {
+  var _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final note = widget.note;
+    final paperColor = _wallPaperColor(note);
+    final accent = _wallAccentColor(note);
+    final lines = _notePreviewLines(note);
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTap: () async {
+        if (note.id.startsWith('preview-')) return;
+        final updated = await Navigator.of(context).push<Note>(
+          MaterialPageRoute(builder: (_) => NoteEditorPage(note: note)),
+        );
+        if (updated != null && context.mounted) {
+          await context.read<AppStore>().updateNote(updated);
+        }
+      },
+      child: AnimatedScale(
+        scale: _pressed ? 0.98 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(15, 16, 13, 12),
+          decoration: BoxDecoration(
+            color: paperColor,
+            borderRadius: BorderRadius.circular(7),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.22),
+                blurRadius: 13,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                right: -10,
+                top: -14,
+                child: Transform.rotate(
+                  angle: note.priority == TaskPriority.high ? 0.16 : -0.2,
+                  child: Icon(
+                    note.priority == TaskPriority.medium
+                        ? Icons.star_rounded
+                        : Icons.push_pin_rounded,
+                    size: note.priority == TaskPriority.medium ? 31 : 28,
+                    color: accent,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: -14,
+                bottom: -16,
+                child: Transform.rotate(
+                  angle: -0.35,
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.32),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    note.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.1,
+                      fontWeight: FontWeight.w900,
+                      decoration: note.done ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  for (final line in lines)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• $line',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, height: 1.28),
+                      ),
+                    ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.38),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _relativeTimeLabel(note.createdAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textPrimary.withValues(alpha: 0.55),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TodayTasksCard extends StatelessWidget {
+  const TodayTasksCard({super.key, required this.tasks});
+
+  final List<Note> tasks;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleTasks = tasks.isEmpty
+        ? [
+            Note(
+              id: 'task-empty-1',
+              title: '设计评审会议',
+              content: '',
+              createdAt: DateTime.now(),
+              reminderAt: DateTime(
+                DateTime.now().year,
+                DateTime.now().month,
+                DateTime.now().day,
+                10,
+              ),
+            ),
+            Note(
+              id: 'task-empty-2',
+              title: '收集用户反馈',
+              content: '',
+              createdAt: DateTime.now(),
+              done: true,
+              reminderAt: DateTime(
+                DateTime.now().year,
+                DateTime.now().month,
+                DateTime.now().day,
+                11,
+                30,
+              ),
+            ),
+            Note(
+              id: 'task-empty-3',
+              title: '输出设计方案',
+              content: '',
+              createdAt: DateTime.now(),
+              reminderAt: DateTime(
+                DateTime.now().year,
+                DateTime.now().month,
+                DateTime.now().day,
+                15,
+              ),
+            ),
+          ]
+        : tasks;
+    return Container(
+      height: 118,
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      decoration: _paperDecoration(Colors.white, radius: 10),
+      child: Column(
+        children: [
+          for (var i = 0; i < visibleTasks.take(3).length; i++) ...[
+            Expanded(child: TaskMiniRow(note: visibleTasks[i])),
+            if (i != visibleTasks.take(3).length - 1)
+              Divider(
+                height: 1,
+                color: const Color(0xFFEBDDC8).withValues(alpha: 0.65),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class TaskMiniRow extends StatelessWidget {
+  const TaskMiniRow({super.key, required this.note});
+
+  final Note note;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPreview = note.id.startsWith('task-empty-');
+    return InkWell(
+      onTap: isPreview
+          ? null
+          : () => context.read<AppStore>().toggleDone(note.id),
+      child: Row(
+        children: [
+          Icon(
+            note.done
+                ? Icons.check_box_rounded
+                : Icons.check_box_outline_blank_rounded,
+            size: 21,
+            color: note.done
+                ? const Color(0xFF54A58A)
+                : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              note.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                decoration: note.done ? TextDecoration.lineThrough : null,
+                color: note.done
+                    ? AppColors.textSecondary
+                    : AppColors.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            note.reminderAt == null
+                ? ''
+                : DateFormat('HH:mm').format(note.reminderAt!),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (!note.done) ...[
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.star_border_rounded,
+              size: 19,
+              color: Color(0xFFB8AA8A),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class MiniCalendarCard extends StatelessWidget {
+  const MiniCalendarCard({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final first = DateTime(now.year, now.month);
+    final leading = first.weekday % 7;
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    final cells = <int?>[
+      for (var i = 0; i < leading; i++) null,
+      for (var day = 1; day <= daysInMonth; day++) day,
+    ];
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Container(
+        height: 118,
+        padding: const EdgeInsets.fromLTRB(11, 10, 11, 9),
+        decoration: _paperDecoration(Colors.white, radius: 10),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: -9,
+              top: -20,
+              child: Transform.rotate(
+                angle: -0.28,
+                child: Container(
+                  width: 46,
+                  height: 16,
+                  color: const Color(0xFFFFE2A6).withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.chevron_left_rounded, size: 18),
+                    const Spacer(),
+                    Text(
+                      '${now.month}月  ${now.year}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.chevron_right_rounded, size: 18),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _CalendarLabel('日'),
+                    _CalendarLabel('一'),
+                    _CalendarLabel('二'),
+                    _CalendarLabel('三'),
+                    _CalendarLabel('四'),
+                    _CalendarLabel('五'),
+                    _CalendarLabel('六'),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Expanded(
+                  child: GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: 42,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 7,
+                        ),
+                    itemBuilder: (_, index) {
+                      final day = index < cells.length ? cells[index] : null;
+                      final selected = day == now.day;
+                      return Center(
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? AppColors.yellow
+                                : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            day == null ? '' : '$day',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: selected
+                                  ? FontWeight.w900
+                                  : FontWeight.w600,
+                              color: day == null
+                                  ? AppColors.textSecondary.withValues(
+                                      alpha: 0.35,
+                                    )
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarLabel extends StatelessWidget {
+  const _CalendarLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+    );
+  }
+}
+
+class AchievementShelf extends StatelessWidget {
+  const AchievementShelf({
+    super.key,
+    required this.doneCount,
+    required this.streak,
+    required this.activeDays,
+    required this.onTap,
+  });
+
+  final int doneCount;
+  final int streak;
+  final int activeDays;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final badges = [
+      AchievementView('初来乍到', '创建第一个笔记', Icons.star_rounded, AppColors.yellow),
+      AchievementView(
+        '坚持记录',
+        '连续记录 $streak 天',
+        Icons.verified_rounded,
+        AppColors.green,
+      ),
+      AchievementView(
+        '高效达人',
+        '完成 $doneCount 个任务',
+        Icons.workspace_premium_rounded,
+        AppColors.pink,
+      ),
+      AchievementView(
+        '灵感捕手',
+        '活跃 $activeDays 天',
+        Icons.military_tech_rounded,
+        AppColors.blue,
+      ),
+      const AchievementView(
+        '整理大师',
+        '归档 50 条内容',
+        Icons.diamond_rounded,
+        AppColors.purple,
+      ),
+    ];
+    return SizedBox(
+      height: 128,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemBuilder: (context, index) =>
+            AchievementBadgeCard(badge: badges[index], onTap: onTap),
+        separatorBuilder: (context, index) => const SizedBox(width: 14),
+        itemCount: badges.length,
+      ),
+    );
+  }
+}
+
+class AchievementBadgeCard extends StatelessWidget {
+  const AchievementBadgeCard({
+    super.key,
+    required this.badge,
+    required this.onTap,
+  });
+
+  final AchievementView badge;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final stroke = Color.lerp(badge.color, Colors.black, 0.34)!;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        width: 78,
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 9),
+        decoration: _paperDecoration(badge.color, radius: 8),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              top: -17,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: Color.lerp(badge.color, Colors.white, 0.25),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(badge.icon, size: 40, color: stroke),
+                const SizedBox(height: 8),
+                Text(
+                  badge.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  badge.desc,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AchievementView {
+  const AchievementView(this.title, this.desc, this.icon, this.color);
+
+  final String title;
+  final String desc;
+  final IconData icon;
+  final Color color;
+}
+
+class StickyBottomNav extends StatelessWidget {
+  const StickyBottomNav({
+    super.key,
+    required this.selectedIndex,
+    required this.onChanged,
+    required this.onAdd,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 78,
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 16,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          NavItem(
+            icon: Icons.home_rounded,
+            label: '首页',
+            active: selectedIndex == 0,
+            onTap: () => onChanged(0),
+          ),
+          NavItem(
+            icon: Icons.edit_note_rounded,
+            label: '笔记',
+            active: selectedIndex == 1,
+            onTap: () => onChanged(1),
+          ),
+          AddNavButton(onTap: onAdd),
+          NavItem(
+            icon: Icons.check_box_outlined,
+            label: '任务',
+            active: selectedIndex == 2,
+            onTap: () => onChanged(2),
+          ),
+          NavItem(
+            icon: Icons.calendar_month_rounded,
+            label: '日历',
+            active: selectedIndex == 3,
+            onTap: () => onChanged(3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class NavItem extends StatelessWidget {
+  const NavItem({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 54,
+        height: 58,
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.yellow.withValues(alpha: 0.75)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 25, color: AppColors.textPrimary),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AddNavButton extends StatefulWidget {
+  const AddNavButton({super.key, required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  State<AddNavButton> createState() => _AddNavButtonState();
+}
+
+class _AddNavButtonState extends State<AddNavButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      lowerBound: 0.96,
+      upperBound: 1.04,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _controller,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 62,
+          height: 62,
+          decoration: const BoxDecoration(
+            color: AppColors.yellow,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.cardShadow,
+                blurRadius: 13,
+                offset: Offset(0, 7),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.add_rounded, size: 36),
+        ),
+      ),
+    );
+  }
+}
+
+class TaskPage extends StatelessWidget {
+  const TaskPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final notes = context.watch<AppStore>().notes;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 84, 18, 118),
+      children: [
+        TodayTasksCard(tasks: notes.take(3).toList()),
+        const SizedBox(height: 18),
+        for (final note in notes)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: NoteCard(note: note),
+          ),
+      ],
+    );
+  }
+}
+
+BoxDecoration _paperDecoration(Color color, {double radius = 14}) {
+  return BoxDecoration(
+    color: color,
+    borderRadius: BorderRadius.circular(radius),
+    boxShadow: const [
+      BoxShadow(
+        color: AppColors.cardShadow,
+        blurRadius: 12,
+        offset: Offset(0, 6),
+      ),
+    ],
+  );
+}
+
+Color _wallPaperColor(Note note) {
+  if (note.id == 'preview-inspiration') {
+    return AppColors.blue.withValues(alpha: 0.86);
+  }
+  if (note.id == 'preview-reading') {
+    return AppColors.pink.withValues(alpha: 0.76);
+  }
+  return switch (note.priority) {
+    TaskPriority.high => AppColors.pink.withValues(alpha: 0.72),
+    TaskPriority.medium => AppColors.yellow.withValues(alpha: 0.78),
+    TaskPriority.low => AppColors.green.withValues(alpha: 0.78),
+  };
+}
+
+Color _wallAccentColor(Note note) {
+  if (note.id == 'preview-inspiration') return const Color(0xFF5297FF);
+  if (note.id == 'preview-reading') return const Color(0xFFFF7892);
+  return switch (note.priority) {
+    TaskPriority.high => const Color(0xFFFF7892),
+    TaskPriority.medium => const Color(0xFFFFC928),
+    TaskPriority.low => const Color(0xFF78D46D),
+  };
+}
+
+List<String> _notePreviewLines(Note note) {
+  return note.content
+      .split(RegExp(r'[\n，,。；;]+'))
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .take(2)
+      .toList();
+}
+
+String _relativeTimeLabel(DateTime date) {
+  final now = DateTime.now();
+  final today = _dateOnly(now);
+  final day = _dateOnly(date);
+  final time = DateFormat('HH:mm').format(date);
+  if (day.isAtSameMomentAs(today)) return '今天 $time';
+  if (day.isAtSameMomentAs(today.subtract(const Duration(days: 1)))) {
+    return '昨天 $time';
+  }
+  return DateFormat('M月d日 HH:mm').format(date);
 }
 
 class NotesPage extends StatelessWidget {
