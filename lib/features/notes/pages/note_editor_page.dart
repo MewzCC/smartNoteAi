@@ -236,14 +236,34 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
       builder: (sheetContext) => NoteChecklistEditor(
         onInsertChecklist: () {
           Navigator.pop(sheetContext);
-          _appendContent('- [ ] 任务一\n- [ ] 任务二\n- [ ] 任务三');
+          _insertChecklistTemplate();
         },
         onAppendTodo: () {
           Navigator.pop(sheetContext);
-          _appendContent('- [ ] ');
+          _appendChecklistTodo();
         },
       ),
     );
+  }
+
+  void _insertChecklistTemplate() {
+    _markAsTask();
+    _appendContent(['☐ 待完成事项一', '☐ 待完成事项二', '☐ 待完成事项三'].join('\n'));
+    ToastUtils.show('已添加可勾选待办清单');
+  }
+
+  void _appendChecklistTodo() {
+    _markAsTask();
+    _appendContent('☐ 新待办事项');
+    ToastUtils.show('已添加一条可勾选待办');
+  }
+
+  void _markAsTask() {
+    setState(() {
+      _isTask = true;
+      _done = false;
+    });
+    _scheduleAutoSave();
   }
 
   void _openAiPanel() {

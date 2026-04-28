@@ -7,6 +7,7 @@ import '../../../core/utils/date_utils.dart';
 import '../../../features/home/provider/home_provider.dart';
 import '../../../shared/components/paper_background.dart';
 import '../../../shared/enums/note_color.dart';
+import '../widgets/note_checklist_content.dart';
 
 class NoteDetailPage extends ConsumerWidget {
   const NoteDetailPage({super.key, required this.noteId});
@@ -92,9 +93,25 @@ class NoteDetailPage extends ConsumerWidget {
                                   Expanded(
                                     child: SingleChildScrollView(
                                       physics: const BouncingScrollPhysics(),
-                                      child: Text(
-                                        note.content,
-                                        style: const TextStyle(height: 1.8),
+                                      child: NoteChecklistContent(
+                                        content: note.content,
+                                        textStyle: const TextStyle(
+                                          height: 1.8,
+                                        ),
+                                        onToggle: (lineIndex) async {
+                                          final nextContent =
+                                              toggleChecklistLine(
+                                                note.content,
+                                                lineIndex,
+                                              );
+                                          await ref
+                                              .read(smartNoteProvider.notifier)
+                                              .updateNote(
+                                                note.copyWith(
+                                                  content: nextContent,
+                                                ),
+                                              );
+                                        },
                                       ),
                                     ),
                                   ),

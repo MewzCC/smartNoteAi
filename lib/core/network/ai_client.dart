@@ -51,6 +51,7 @@ class AiClient {
       data: {
         'model': config.model,
         'temperature': 0.35,
+        'max_tokens': 1800,
         'messages': [
           {
             'role': 'system',
@@ -59,6 +60,8 @@ class AiClient {
               scopeDescription: scope.description,
               rangeText: scope.rangeText,
               days: scope.days,
+              hasExplicitDayCount: scope.hasExplicitDayCount,
+              hasWeeklyPlanIntent: scope.hasWeeklyPlanIntent,
               maxItems: scope.maxItems,
               customTags: config.customTags,
             ),
@@ -207,6 +210,8 @@ class _PlanScope {
     required this.now,
     required this.startDay,
     required this.days,
+    required this.hasExplicitDayCount,
+    required this.hasWeeklyPlanIntent,
     required this.maxItems,
     required this.description,
   });
@@ -214,6 +219,8 @@ class _PlanScope {
   final DateTime now;
   final DateTime startDay;
   final int days;
+  final bool hasExplicitDayCount;
+  final bool hasWeeklyPlanIntent;
   final int maxItems;
   final String description;
 
@@ -253,30 +260,41 @@ class _PlanScope {
         now: now,
         startDay: today,
         days: days,
+        hasExplicitDayCount: true,
+        hasWeeklyPlanIntent: false,
         maxItems: days == 1 ? 5 : days,
         description: '$days 天计划',
       );
     }
-    if (compact.contains('下周')) {
-      final nextWeekStart = today.add(Duration(days: 8 - today.weekday));
-      return _PlanScope(
-        now: now,
-        startDay: nextWeekStart,
-        days: 7,
-        maxItems: 7,
-        description: '下周计划',
-      );
+    if (_isWeeklySummaryIntent(compact)) {
+      if (compact.contains('下周')) {
+        return _PlanScope._single(now, today, '未明确天数（下周总结类，按单条聚合）');
+      }
+      if (compact.contains('本周') || compact.contains('这周') || compact.contains('周')) {
+        return _PlanScope._single(now, today, '未明确天数（本周总结类，按单条聚合）');
+      }
     }
-    if (compact.contains('本周') ||
-        compact.contains('这周') ||
-        compact.contains('周计划')) {
-      final remainingDays = 8 - today.weekday;
+    if (_isWeeklyPlanningIntent(compact)) {
+      if (compact.contains('下周')) {
+        final nextWeekStart = today.add(Duration(days: 8 - today.weekday));
+        return _PlanScope(
+          now: now,
+          startDay: nextWeekStart,
+          days: 7,
+          hasExplicitDayCount: false,
+          hasWeeklyPlanIntent: true,
+          maxItems: 7,
+          description: '下周计划',
+        );
+      }
       return _PlanScope(
         now: now,
         startDay: today,
-        days: remainingDays,
-        maxItems: remainingDays,
-        description: '本周剩余计划',
+        days: 7,
+        hasExplicitDayCount: false,
+        hasWeeklyPlanIntent: true,
+        maxItems: 7,
+        description: compact.contains('本周') || compact.contains('这周') ? '本周计划' : '一周计划',
       );
     }
     return _PlanScope._single(now, today, '今天');
@@ -287,7 +305,9 @@ class _PlanScope {
       now: now,
       startDay: _dateOnly(day),
       days: 1,
-      maxItems: 5,
+      hasExplicitDayCount: false,
+      hasWeeklyPlanIntent: false,
+      maxItems: 1,
       description: description,
     );
   }
@@ -338,6 +358,52 @@ bool _hasTodayWord(String value) {
       value.contains('上午') ||
       value.contains('下午') ||
       value.contains('晚上');
+}
+
+bool _isWeeklyPlanningIntent(String value) {
+  const planningKeywords = [
+    '计划',
+    '安排',
+    '待办',
+    '任务',
+    '健身',
+    '训练',
+    '学习',
+    '工作',
+    '复习',
+    '课程',
+  ];
+  final hasWeekWord =
+      value.contains('周计划') ||
+      value.contains('下周') ||
+      value.contains('本周') ||
+      value.contains('这周') ||
+      value.contains('一周') ||
+      value.contains('周');
+  final hasPlanningKeyword = planningKeywords.any(value.contains);
+  return hasWeekWord && hasPlanningKeyword && !_isWeeklySummaryIntent(value);
+}
+
+bool _isWeeklySummaryIntent(String value) {
+  const summaryKeywords = [
+    '总结',
+    '归纳',
+    '汇总',
+    '梳理',
+    '回顾',
+    '复盘',
+    '提炼',
+    '记录',
+    '概括',
+    '整理',
+  ];
+  final hasWeekWord =
+      value.contains('本周') ||
+      value.contains('这周') ||
+      value.contains('下周') ||
+      value.contains('一周') ||
+      value.contains('周');
+  return hasWeekWord && summaryKeywords.any(value.contains);
 }
 
 int? _parseDayCount(String value) {
