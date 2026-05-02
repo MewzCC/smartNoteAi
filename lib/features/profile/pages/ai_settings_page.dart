@@ -272,7 +272,7 @@ const aiProviders = [
   AiProviderModel(
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-pro',
     homepage: 'https://platform.deepseek.com/api_keys',
     tip: 'DeepSeek 使用 OpenAI 兼容接口格式。',
   ),

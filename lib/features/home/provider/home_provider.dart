@@ -143,7 +143,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
         reminderAt: plan.reminderAt,
         priority: plan.priority,
         paperColor: noteColorFromPriority(plan.priority),
-        tag: 'AI',
+        tag: plan.tag,
         isTask: true,
       );
     }).toList();
@@ -156,7 +156,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
   Future<void> addGeneratedPlan(
     GeneratedPlan plan, {
     DateTime? reminderAt,
-    String tag = 'AI',
+    String? tag,
     bool isTask = true,
   }) async {
     final created = _notes.create(
@@ -165,7 +165,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
       reminderAt: reminderAt ?? plan.reminderAt,
       priority: plan.priority,
       paperColor: noteColorFromPriority(plan.priority),
-      tag: tag,
+      tag: tag ?? plan.tag,
       isTask: isTask,
     );
     await _persist([...state.notes, created]);

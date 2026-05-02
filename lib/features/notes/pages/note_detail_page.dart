@@ -95,9 +95,7 @@ class NoteDetailPage extends ConsumerWidget {
                                       physics: const BouncingScrollPhysics(),
                                       child: NoteChecklistContent(
                                         content: note.content,
-                                        textStyle: const TextStyle(
-                                          height: 1.8,
-                                        ),
+                                        textStyle: const TextStyle(height: 1.8),
                                         onToggle: (lineIndex) async {
                                           final nextContent =
                                               toggleChecklistLine(

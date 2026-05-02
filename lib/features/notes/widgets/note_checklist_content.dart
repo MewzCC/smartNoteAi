@@ -30,7 +30,8 @@ List<NoteChecklistLine> extractChecklistLines(String content) {
   return items;
 }
 
-bool hasChecklistLines(String content) => extractChecklistLines(content).isNotEmpty;
+bool hasChecklistLines(String content) =>
+    extractChecklistLines(content).isNotEmpty;
 
 String toggleChecklistLine(String content, int lineIndex) {
   final lines = content.split('\n');

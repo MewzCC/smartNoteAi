@@ -143,6 +143,7 @@ class _AiPageState extends ConsumerState<AiPage> {
                       entry.key,
                       entry.value.content,
                     ).text,
+                    tag: _selectedTags[entry.key] ?? entry.value.tag,
                     reminderAt:
                         _selectedTimes[entry.key] ??
                         entry.value.reminderAt ??
@@ -285,6 +286,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         entry.value.content,
       ).text.trim(),
       priority: _selectedPriorities[entry.key] ?? entry.value.priority,
+      tag: _selectedTags[entry.key] ?? entry.value.tag,
     );
   }
 
@@ -303,7 +305,7 @@ class _AiPageState extends ConsumerState<AiPage> {
               _fallbackFutureTime(entry.key),
           initialPriority:
               _selectedPriorities[entry.key] ?? entry.value.priority,
-          initialTag: _selectedTags[entry.key] ?? 'AI',
+          initialTag: _selectedTags[entry.key] ?? entry.value.tag,
           initialIsTask: _selectedTaskFlags[entry.key] ?? true,
         ),
       ),
@@ -330,7 +332,7 @@ class _AiPageState extends ConsumerState<AiPage> {
         .addGeneratedPlan(
           _editedPlan(entry),
           reminderAt: time,
-          tag: _selectedTags[entry.key] ?? 'AI',
+          tag: _selectedTags[entry.key] ?? entry.value.tag,
           isTask: _selectedTaskFlags[entry.key] ?? true,
         );
     setState(() => _dismissedResults.add(entry.key));
@@ -350,7 +352,7 @@ class _AiPageState extends ConsumerState<AiPage> {
           .addGeneratedPlan(
             _editedPlan(entry),
             reminderAt: time,
-            tag: _selectedTags[entry.key] ?? 'AI',
+            tag: _selectedTags[entry.key] ?? entry.value.tag,
             isTask: _selectedTaskFlags[entry.key] ?? true,
           );
     }
@@ -391,6 +393,7 @@ class _GeneratedPlanCard extends StatelessWidget {
   const _GeneratedPlanCard({
     required this.title,
     required this.content,
+    required this.tag,
     required this.reminderAt,
     required this.onPickTime,
     required this.onAdd,
@@ -399,6 +402,7 @@ class _GeneratedPlanCard extends StatelessWidget {
 
   final String title;
   final String content;
+  final String tag;
   final DateTime reminderAt;
   final VoidCallback onPickTime;
   final VoidCallback onAdd;
@@ -428,6 +432,22 @@ class _GeneratedPlanCard extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
             ),
             const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                tag,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.accentText,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             Expanded(
               child: Text(
                 content.isEmpty ? '点击编辑内容' : content,
@@ -543,9 +563,16 @@ class _GeneratedPlanEditorPageState
   Widget build(BuildContext context) {
     final state = ref.watch(smartNoteProvider);
     final tags = <String>{
+      '全部',
+      '灵感',
+      '工作',
+      '生活',
+      '学习',
+      '健康',
       ...state.config.customTags,
       ...state.notes.map((note) => note.tag),
       'AI',
+      _tag,
     }.where((tag) => tag.trim().isNotEmpty).toList();
     return Scaffold(
       resizeToAvoidBottomInset: true,
