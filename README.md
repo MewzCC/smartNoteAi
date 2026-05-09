@@ -11,7 +11,6 @@
 <p align="center">
   <img alt="Flutter" src="https://img.shields.io/badge/Flutter-跨平台-54C5F8?style=for-the-badge&logo=flutter&logoColor=white" />
   <img alt="Dart" src="https://img.shields.io/badge/Dart-应用开发-0175C2?style=for-the-badge&logo=dart&logoColor=white" />
-  <img alt="Version" src="https://img.shields.io/badge/版本-v1.0.0-FFE88A?style=for-the-badge" />
 </p>
 
 ---
