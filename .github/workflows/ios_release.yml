@@ -1,0 +1,65 @@
+name: Build iOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub release tag to upload the iOS build to
+        required: true
+        default: v1.0.6
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          VERSION_LINE="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          VERSION_NAME="${VERSION_LINE%%+*}"
+          BUILD_NUMBER="${VERSION_LINE##*+}"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build iOS app without code signing
+        run: flutter build ios --release --no-codesign --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          mkdir -p artifacts Payload
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "No iOS app bundle found at $APP_PATH" >&2
+            exit 1
+          fi
+          cp -R "$APP_PATH" Payload/
+          zip -qry "artifacts/SmartNote-v${VERSION_NAME}-ios-unsigned.ipa" Payload
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartNote-v${{ env.VERSION_NAME }}-ios-unsigned
+          path: artifacts/SmartNote-v${{ env.VERSION_NAME }}-ios-unsigned.ipa
+
+      - name: Upload to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: artifacts/SmartNote-v${{ env.VERSION_NAME }}-ios-unsigned.ipa
+          fail_on_unmatched_files: true
