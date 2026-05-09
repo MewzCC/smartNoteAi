@@ -122,7 +122,7 @@ lib/
 
 🎁 可以在 GitHub Releases 中下载已打包的 APK：
 
-👉 [下载 v1.0.0 APK](https://github.com/MewzCC/smartNoteAi/releases/tag/v1.0.0)
+👉 [下载 v1.0.0 APK](https://github.com/MewzCC/smartNoteAi/releases)
 
 ---
 
