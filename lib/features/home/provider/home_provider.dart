@@ -12,6 +12,7 @@ import '../../../data/repositories/note_repository.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
+import '../../../shared/enums/reminder_repeat.dart';
 import '../../../shared/helpers/checklist_helper.dart';
 
 class SmartNoteState {
@@ -122,6 +123,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     required String title,
     required String content,
     DateTime? reminderAt,
+    ReminderRepeat reminderRepeat = ReminderRepeat.none,
     NotePriority priority = NotePriority.medium,
     NoteColor? paperColor,
     String tag = '全部',
@@ -133,6 +135,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
       title: title,
       content: content,
       reminderAt: reminderAt,
+      reminderRepeat: reminderRepeat,
       priority: priority,
       paperColor: paperColor,
       tag: tag,

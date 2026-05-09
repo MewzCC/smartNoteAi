@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/constants/hive_keys.dart';
 import '../../shared/enums/note_color.dart';
 import '../../shared/enums/note_priority.dart';
+import '../../shared/enums/reminder_repeat.dart';
 import '../local/hive_boxes.dart';
 import '../models/note_model.dart';
 
@@ -34,6 +35,7 @@ class NoteRepository {
     required String title,
     required String content,
     DateTime? reminderAt,
+    ReminderRepeat reminderRepeat = ReminderRepeat.none,
     NotePriority priority = NotePriority.medium,
     NoteColor? paperColor,
     String tag = '全部',
@@ -47,6 +49,7 @@ class NoteRepository {
       content: content,
       createdAt: DateTime.now(),
       reminderAt: reminderAt,
+      reminderRepeat: reminderRepeat,
       priority: priority,
       paperColor: paperColor ?? noteColorFromPriority(priority),
       tag: tag,

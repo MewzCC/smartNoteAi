@@ -5,22 +5,30 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/toast_utils.dart';
 import '../../../core/widgets/sticky_app_bar.dart';
+import '../../../shared/enums/reminder_repeat.dart';
 
 class NoteReminderResult {
-  const NoteReminderResult({required this.enabled, this.time});
+  const NoteReminderResult({
+    required this.enabled,
+    this.time,
+    this.repeat = ReminderRepeat.none,
+  });
 
   final bool enabled;
   final DateTime? time;
+  final ReminderRepeat repeat;
 }
 
 class NoteReminderPicker extends StatefulWidget {
   const NoteReminderPicker({
     super.key,
     this.initialTime,
+    this.initialRepeat = ReminderRepeat.none,
     required this.onFinish,
   });
 
   final DateTime? initialTime;
+  final ReminderRepeat initialRepeat;
   final ValueChanged<NoteReminderResult> onFinish;
 
   @override
@@ -30,17 +38,18 @@ class NoteReminderPicker extends StatefulWidget {
 class _NoteReminderPickerState extends State<NoteReminderPicker> {
   late bool _enabled;
   late DateTime _draft;
-  String _repeat = '不重复';
+  late String _repeat;
 
   @override
   void initState() {
     super.initState();
     final minimum = _minimumReminderTime();
     final initial = widget.initialTime;
-    _enabled = initial != null;
+    _enabled = initial != null || true; // 默认开启提醒
     _draft = initial != null && initial.isAfter(minimum)
         ? initial
         : minimum.add(const Duration(minutes: 1));
+    _repeat = widget.initialRepeat.label;
   }
 
   @override
@@ -148,7 +157,13 @@ class _NoteReminderPickerState extends State<NoteReminderPicker> {
       ToastUtils.show('请选择未来时间');
       return;
     }
-    widget.onFinish(NoteReminderResult(enabled: true, time: _draft));
+    widget.onFinish(
+      NoteReminderResult(
+        enabled: true,
+        time: _draft,
+        repeat: ReminderRepeat.fromLabel(_repeat),
+      ),
+    );
   }
 
   DateTime _minimumReminderTime() {

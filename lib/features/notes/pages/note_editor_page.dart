@@ -13,6 +13,7 @@ import '../../../features/home/provider/home_provider.dart';
 import '../../../shared/components/paper_background.dart';
 import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
+import '../../../shared/enums/reminder_repeat.dart';
 import '../../../shared/helpers/checklist_helper.dart';
 import '../pages/note_preview_page.dart';
 import '../pages/note_reminder_page.dart';
@@ -43,6 +44,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
   late final TextEditingController _aiPrompt;
   Timer? _autoSaveTimer;
   DateTime? _reminderAt;
+  ReminderRepeat _reminderRepeat = ReminderRepeat.none;
   NotePriority _priority = NotePriority.medium;
   NoteColor _paperColor = NoteColor.yellow;
   String _tag = '全部';
@@ -70,6 +72,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     _newTag = TextEditingController();
     _aiPrompt = TextEditingController();
     _reminderAt = note?.reminderAt;
+    _reminderRepeat = note?.reminderRepeat ?? ReminderRepeat.none;
     _priority = note?.priority ?? NotePriority.medium;
     _paperColor = note?.paperColor ?? noteColorFromPriority(_priority);
     _tag = note?.tag ?? '全部';
@@ -200,13 +203,20 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
   Future<void> _openReminderPage() async {
     final result = await Navigator.of(context).push<NoteReminderResult>(
       buildAppPageRoute(
-        child: NoteReminderPage(initialTime: _reminderAt),
+        child: NoteReminderPage(
+          initialTime: _reminderAt,
+          initialRepeat: _reminderRepeat,
+        ),
         axis: AxisDirection.up,
       ),
     );
     if (result == null || !mounted) return;
     setState(() {
       _reminderAt = result.enabled ? result.time : null;
+      _reminderRepeat = result.enabled ? result.repeat : ReminderRepeat.none;
+      if (result.enabled) {
+        _isTask = true; // 设置提醒时自动开启加入任务
+      }
     });
     _scheduleAutoSave();
   }
@@ -431,6 +441,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         title: title,
         content: content,
         reminderAt: _reminderAt,
+        reminderRepeat: _reminderRepeat,
         priority: _priority,
         paperColor: _paperColor,
         tag: _tag,
@@ -444,6 +455,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           title: title,
           content: content,
           reminderAt: _reminderAt,
+          reminderRepeat: _reminderRepeat,
           clearReminder: _reminderAt == null,
           priority: _priority,
           paperColor: _paperColor,

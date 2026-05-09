@@ -10,6 +10,7 @@ import '../../../shared/components/paper_background.dart';
 import '../../../shared/enums/note_color.dart';
 import '../../../shared/helpers/checklist_helper.dart';
 import 'note_reminder_page.dart';
+export '../../../shared/enums/reminder_repeat.dart';
 import '../widgets/note_checklist_content.dart';
 
 class NoteDetailPage extends ConsumerWidget {
@@ -163,6 +164,8 @@ class NoteDetailPage extends ConsumerWidget {
                                                     child: NoteReminderPage(
                                                       initialTime:
                                                           note.reminderAt,
+                                                      initialRepeat:
+                                                          note.reminderRepeat,
                                                     ),
                                                     axis: AxisDirection.up,
                                                   ),
@@ -177,6 +180,9 @@ class NoteDetailPage extends ConsumerWidget {
                                                     reminderAt: result.time,
                                                     clearReminder:
                                                         !result.enabled,
+                                                    isTask: result.enabled
+                                                        ? true
+                                                        : note.isTask,
                                                   ),
                                                 );
                                           },

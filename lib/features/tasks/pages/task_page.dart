@@ -9,6 +9,7 @@ import '../../../core/widgets/sticky_tag.dart';
 import '../../../data/models/note_model.dart';
 import '../../../shared/components/app_scaffold.dart';
 import '../../../shared/components/empty_state.dart';
+import '../../../shared/enums/reminder_repeat.dart';
 import '../../../shared/helpers/checklist_helper.dart';
 import '../provider/task_provider.dart';
 import '../widgets/task_create_sheet.dart';
@@ -340,13 +341,19 @@ class _TaskBuckets {
         noDate.add(note);
         continue;
       }
-      final day = dateOnly(reminder);
-      if (day.isAtSameMomentAs(today)) {
-        todayNotes.add(note);
-      } else if (!day.isBefore(weekStart) && day.isBefore(weekEnd)) {
-        thisWeek.putIfAbsent(day, () => <NoteModel>[]).add(note);
-      } else {
-        otherDays.putIfAbsent(day, () => <NoteModel>[]).add(note);
+
+      // 获取所有需要显示的日期（考虑重复提醒）
+      final displayDates = _getDisplayDates(note, today);
+      
+      for (final displayDate in displayDates) {
+        final day = dateOnly(displayDate);
+        if (day.isAtSameMomentAs(today)) {
+          todayNotes.add(note);
+        } else if (!day.isBefore(weekStart) && day.isBefore(weekEnd)) {
+          thisWeek.putIfAbsent(day, () => <NoteModel>[]).add(note);
+        } else if (day.isAfter(today)) {
+          otherDays.putIfAbsent(day, () => <NoteModel>[]).add(note);
+        }
       }
     }
 
@@ -356,6 +363,105 @@ class _TaskBuckets {
       otherDays: otherDays,
       noDate: noDate,
     );
+  }
+
+  static List<DateTime> _getDisplayDates(NoteModel note, DateTime today) {
+    final reminder = note.reminderAt!;
+    final reminderDay = dateOnly(reminder);
+    
+    // 如果没有重复，只显示原始提醒日期（如果在今天或之后）
+    if (note.reminderRepeat == ReminderRepeat.none) {
+      if (reminderDay.isAtSameMomentAs(today) || reminderDay.isAfter(today)) {
+        return [reminder];
+      }
+      return [];
+    }
+
+    // 处理重复提醒
+    final dates = <DateTime>[];
+    var currentDate = reminderDay;
+
+    // 如果原始日期已经过去，计算下一个提醒日期
+    if (currentDate.isBefore(today)) {
+      currentDate = _calculateNextReminderDate(note, today);
+    }
+
+    // 根据重复类型获取显示日期
+    switch (note.reminderRepeat) {
+      case ReminderRepeat.daily:
+        // 显示今天（如果有）和未来几天
+        for (var i = 0; i < 7; i++) {
+          final checkDate = today.add(Duration(days: i));
+          if (!currentDate.isBefore(checkDate)) {
+            final diff = currentDate.difference(checkDate).inDays;
+            if (diff % 1 == 0) {
+              dates.add(DateTime(
+                checkDate.year,
+                checkDate.month,
+                checkDate.day,
+                reminder.hour,
+                reminder.minute,
+              ));
+            }
+          }
+        }
+        break;
+      case ReminderRepeat.weekly:
+        // 计算本周和下周的提醒日期
+        for (var i = 0; i < 14; i++) {
+          final checkDate = today.add(Duration(days: i));
+          if (checkDate.weekday == reminder.weekday) {
+            dates.add(DateTime(
+              checkDate.year,
+              checkDate.month,
+              checkDate.day,
+              reminder.hour,
+              reminder.minute,
+            ));
+          }
+        }
+        break;
+      case ReminderRepeat.monthly:
+        // 显示本月和下月的提醒日期
+        for (var i = 0; i < 60; i++) {
+          final checkDate = today.add(Duration(days: i));
+          if (checkDate.day == reminder.day) {
+            dates.add(DateTime(
+              checkDate.year,
+              checkDate.month,
+              checkDate.day,
+              reminder.hour,
+              reminder.minute,
+            ));
+          }
+        }
+        break;
+      case ReminderRepeat.none:
+        break;
+    }
+
+    return dates;
+  }
+
+  static DateTime _calculateNextReminderDate(NoteModel note, DateTime today) {
+    var nextDate = dateOnly(note.reminderAt!);
+    
+    while (nextDate.isBefore(today)) {
+      switch (note.reminderRepeat) {
+        case ReminderRepeat.daily:
+          nextDate = nextDate.add(const Duration(days: 1));
+          break;
+        case ReminderRepeat.weekly:
+          nextDate = nextDate.add(const Duration(days: 7));
+          break;
+        case ReminderRepeat.monthly:
+          nextDate = nextDate.add(const Duration(days: 30));
+          break;
+        case ReminderRepeat.none:
+          return today;
+      }
+    }
+    return nextDate;
   }
 }
 

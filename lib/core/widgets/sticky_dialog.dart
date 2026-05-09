@@ -7,7 +7,7 @@ class StickyDialog {
     return confirm(
       context: context,
       title: '确认删除该便签？',
-      message: '「$title」删除后不可恢复。',
+      message: '「$title」删除后可在回收站恢复。',
       icon: Icons.delete_outline_rounded,
       confirmText: '确认删除',
       destructive: true,

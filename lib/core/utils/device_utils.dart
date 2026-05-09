@@ -6,6 +6,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../data/models/note_model.dart';
+import '../../shared/enums/reminder_repeat.dart';
 
 class DeviceUtils {
   static bool get isAndroid =>
@@ -84,7 +85,7 @@ class NotificationService {
       iOS: DarwinNotificationDetails(presentSound: true),
     );
 
-    await _scheduleWithFallback(note, details);
+    await _scheduleWithRepeat(note, details);
 
     if (createSystemAlarm) {
       await _tryNativeAlarm(note);
@@ -105,11 +106,20 @@ class NotificationService {
     }
   }
 
-  Future<void> _scheduleWithFallback(
+  Future<void> _scheduleWithRepeat(
     NoteModel note,
     NotificationDetails details,
   ) async {
-    final date = tz.TZDateTime.from(note.reminderAt!, tz.local);
+    var date = tz.TZDateTime.from(note.reminderAt!, tz.local);
+    
+    // 如果提醒时间已经过去，计算下次提醒时间
+    final now = tz.TZDateTime.now(tz.local);
+    if (date.isBefore(now)) {
+      date = _calculateNextReminder(note, now);
+    }
+
+    // 重复提醒将在应用启动时通过 reschedulePending 重新调度
+
     for (final mode in const [
       AndroidScheduleMode.alarmClock,
       AndroidScheduleMode.exactAllowWhileIdle,
@@ -127,6 +137,27 @@ class NotificationService {
         return;
       } catch (_) {}
     }
+  }
+
+  tz.TZDateTime _calculateNextReminder(NoteModel note, tz.TZDateTime now) {
+    var nextDate = tz.TZDateTime.from(note.reminderAt!, tz.local);
+    
+    while (nextDate.isBefore(now)) {
+      switch (note.reminderRepeat) {
+        case ReminderRepeat.daily:
+          nextDate = nextDate.add(const Duration(days: 1));
+          break;
+        case ReminderRepeat.weekly:
+          nextDate = nextDate.add(const Duration(days: 7));
+          break;
+        case ReminderRepeat.monthly:
+          nextDate = nextDate.add(const Duration(days: 30));
+          break;
+        case ReminderRepeat.none:
+          return now.add(const Duration(minutes: 1));
+      }
+    }
+    return nextDate;
   }
 
   Future<void> _tryNativeAlarm(NoteModel note) async {

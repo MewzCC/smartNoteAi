@@ -1,4 +1,5 @@
 import '../../../shared/enums/note_priority.dart';
+import '../../../shared/enums/reminder_repeat.dart';
 
 class NoteEditorState {
   const NoteEditorState({
@@ -10,6 +11,7 @@ class NoteEditorState {
     required this.done,
     required this.isPinned,
     this.reminderAt,
+    this.reminderRepeat = ReminderRepeat.none,
   });
 
   final String title;
@@ -20,6 +22,7 @@ class NoteEditorState {
   final bool done;
   final bool isPinned;
   final DateTime? reminderAt;
+  final ReminderRepeat reminderRepeat;
 
   NoteEditorState copyWith({
     String? title,
@@ -30,6 +33,7 @@ class NoteEditorState {
     bool? done,
     bool? isPinned,
     DateTime? reminderAt,
+    ReminderRepeat? reminderRepeat,
     bool clearReminder = false,
   }) {
     return NoteEditorState(
@@ -41,6 +45,7 @@ class NoteEditorState {
       done: done ?? this.done,
       isPinned: isPinned ?? this.isPinned,
       reminderAt: clearReminder ? null : reminderAt ?? this.reminderAt,
+      reminderRepeat: clearReminder ? ReminderRepeat.none : (reminderRepeat ?? this.reminderRepeat),
     );
   }
 }

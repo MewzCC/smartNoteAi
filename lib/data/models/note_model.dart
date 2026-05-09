@@ -1,5 +1,6 @@
 import '../../shared/enums/note_color.dart';
 import '../../shared/enums/note_priority.dart';
+import '../../shared/enums/reminder_repeat.dart';
 
 class NoteModel {
   const NoteModel({
@@ -8,6 +9,7 @@ class NoteModel {
     required this.content,
     required this.createdAt,
     this.reminderAt,
+    this.reminderRepeat = ReminderRepeat.none,
     this.done = false,
     this.priority = NotePriority.medium,
     this.paperColor = NoteColor.yellow,
@@ -24,6 +26,7 @@ class NoteModel {
   final String content;
   final DateTime createdAt;
   final DateTime? reminderAt;
+  final ReminderRepeat reminderRepeat;
   final bool done;
   final NotePriority priority;
   final NoteColor paperColor;
@@ -38,6 +41,7 @@ class NoteModel {
     String? title,
     String? content,
     DateTime? reminderAt,
+    ReminderRepeat? reminderRepeat,
     bool clearReminder = false,
     bool? done,
     NotePriority? priority,
@@ -56,6 +60,7 @@ class NoteModel {
       content: content ?? this.content,
       createdAt: createdAt,
       reminderAt: clearReminder ? null : reminderAt ?? this.reminderAt,
+      reminderRepeat: clearReminder ? ReminderRepeat.none : (reminderRepeat ?? this.reminderRepeat),
       done: done ?? this.done,
       priority: priority ?? this.priority,
       paperColor: paperColor ?? this.paperColor,
@@ -74,6 +79,7 @@ class NoteModel {
     'content': content,
     'createdAt': createdAt.toIso8601String(),
     'reminderAt': reminderAt?.toIso8601String(),
+    'reminderRepeat': reminderRepeat.name,
     'done': done,
     'priority': priority.name,
     'paperColor': paperColor.name,
@@ -90,6 +96,10 @@ class NoteModel {
       (item) => item.name == json['priority'],
       orElse: () => NotePriority.medium,
     );
+    final reminderRepeat = ReminderRepeat.values.firstWhere(
+      (item) => item.name == json['reminderRepeat'],
+      orElse: () => ReminderRepeat.none,
+    );
     return NoteModel(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -98,6 +108,7 @@ class NoteModel {
       reminderAt: json['reminderAt'] == null
           ? null
           : DateTime.parse(json['reminderAt'] as String),
+      reminderRepeat: reminderRepeat,
       done: json['done'] as bool? ?? false,
       priority: priority,
       paperColor: NoteColor.values.firstWhere(
