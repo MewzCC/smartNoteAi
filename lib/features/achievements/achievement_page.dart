@@ -26,53 +26,70 @@ class AchievementPage extends ConsumerWidget {
     return AppScaffold(
       activePath: '/home',
       child: SafeArea(
-        child: ListView(
+        child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
-          children: [
-            const StickyAppBar(
+          slivers: [
+            const StickySliverAppBar(
               title: '成就徽章',
               showBack: true,
               showSearch: false,
             ),
-            _SummaryCard(
-              totalNotes: stats.totalNotes,
-              doneCount: stats.doneTasks,
-              streak: stats.currentStreak,
-              progress: progress,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: _SummaryCard(
+                  totalNotes: stats.totalNotes,
+                  doneCount: stats.doneTasks,
+                  streak: stats.currentStreak,
+                  progress: progress,
+                ),
+              ),
             ),
-            const SizedBox(height: 18),
-            const Text(
-              '我的徽章',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            const SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  '我的徽章',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final cardWidth = (constraints.maxWidth - 14) / 2;
-                final cardHeight = cardWidth.clamp(154.0, 184.0);
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: achievements.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    mainAxisExtent: cardHeight,
-                  ),
-                  itemBuilder: (context, index) {
-                    return _AchievementCard(item: achievements[index]);
-                  },
-                );
-              },
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverLayoutBuilder(
+                builder: (context, constraints) {
+                  final cardWidth = (constraints.crossAxisExtent - 14) / 2;
+                  final cardHeight = cardWidth.clamp(154.0, 184.0);
+                  return SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) =>
+                          _AchievementCard(item: achievements[index]),
+                      childCount: achievements.length,
+                    ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
+                      mainAxisExtent: cardHeight,
+                    ),
+                  );
+                },
+              ),
             ),
-            const SizedBox(height: 18),
-            _GuideCard(
-              doneCount: stats.doneTasks,
-              activeDays: stats.activeDays,
-              pendingCount: state.pendingCount,
+            const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: _GuideCard(
+                  doneCount: stats.doneTasks,
+                  activeDays: stats.activeDays,
+                  pendingCount: state.pendingCount,
+                ),
+              ),
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 112)),
           ],
         ),
       ),

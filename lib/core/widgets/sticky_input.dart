@@ -13,6 +13,8 @@ class StickyInput extends StatelessWidget {
     this.onChanged,
     this.icon,
     this.suffix,
+    this.focusNode,
+    this.autofocus = false,
     this.minLines = 1,
     this.maxLines = 1,
   }) : hint = hint ?? hintText ?? '';
@@ -23,6 +25,8 @@ class StickyInput extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final IconData? icon;
   final Widget? suffix;
+  final FocusNode? focusNode;
+  final bool autofocus;
   final int minLines;
   final int maxLines;
 
@@ -30,6 +34,8 @@ class StickyInput extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      focusNode: focusNode,
+      autofocus: autofocus,
       onTap: onTap,
       onChanged: onChanged,
       minLines: minLines,

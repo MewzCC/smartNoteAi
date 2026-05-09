@@ -39,52 +39,63 @@ class _ArchivePageState extends ConsumerState<ArchivePage> {
     return AppScaffold(
       activePath: '/home',
       child: SafeArea(
-        child: ListView(
+        child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
-          children: [
-            const StickyAppBar(title: '归档', showBack: true, showSearch: false),
-            StickyInput(
-              controller: _keyword,
-              hintText: '搜索归档内容...',
-              icon: Icons.search_rounded,
-              onChanged: (_) => setState(() {}),
+          slivers: [
+            const StickySliverAppBar(
+              title: '归档',
+              showBack: true,
+              showSearch: false,
             ),
-            const SizedBox(height: 14),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: StickyInput(
+                  controller: _keyword,
+                  hintText: '搜索归档内容...',
+                  icon: Icons.search_rounded,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 14)),
             if (notes.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 32),
-                child: EmptyState(
-                  text: '暂无归档内容',
-                  icon: Icons.archive_outlined,
-                  height: 140,
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(20, 32, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: EmptyState(
+                    text: '暂无归档内容',
+                    icon: Icons.archive_outlined,
+                    height: 140,
+                  ),
                 ),
               )
             else
-              GridView.builder(
-                itemCount: notes.length,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
-                  mainAxisExtent: 166,
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final note = notes[index];
+                    return StickyCard(
+                      note: note,
+                      compact: true,
+                      onArchive: () => ref
+                          .read(smartNoteProvider.notifier)
+                          .toggleArchive(note.id),
+                      onDelete: () => ref
+                          .read(smartNoteProvider.notifier)
+                          .deleteNote(note.id),
+                    );
+                  }, childCount: notes.length),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    mainAxisExtent: 166,
+                  ),
                 ),
-                itemBuilder: (context, index) {
-                  final note = notes[index];
-                  return StickyCard(
-                    note: note,
-                    compact: true,
-                    onArchive: () => ref
-                        .read(smartNoteProvider.notifier)
-                        .toggleArchive(note.id),
-                    onDelete: () => ref
-                        .read(smartNoteProvider.notifier)
-                        .deleteNote(note.id),
-                  );
-                },
               ),
+            const SliverToBoxAdapter(child: SizedBox(height: 112)),
           ],
         ),
       ),

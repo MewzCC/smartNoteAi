@@ -47,10 +47,10 @@ class _TaskPageState extends ConsumerState<TaskPage> {
         child: const Icon(Icons.add_rounded),
       ),
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 110),
-          children: [
-            StickyAppBar(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            StickySliverAppBar(
               title: '任务',
               showSearch: false,
               trailing: PopupMenuButton<String>(
@@ -68,21 +68,26 @@ class _TaskPageState extends ConsumerState<TaskPage> {
                 ],
               ),
             ),
-            _TaskTags(
-              selected: _filter,
-              onChanged: (value) => setState(() => _filter = value),
+            SliverToBoxAdapter(
+              child: _TaskTags(
+                selected: _filter,
+                onChanged: (value) => setState(() => _filter = value),
+              ),
             ),
             if (notes.isEmpty)
-              Padding(
+              SliverPadding(
                 padding: const EdgeInsets.fromLTRB(20, 32, 20, 0),
-                child: EmptyState(
-                  text: '暂无$_filter任务',
-                  icon: Icons.check_box_outlined,
-                  height: 140,
+                sliver: SliverToBoxAdapter(
+                  child: EmptyState(
+                    text: '暂无$_filter任务',
+                    icon: Icons.check_box_outlined,
+                    height: 140,
+                  ),
                 ),
               )
             else
-              _TaskSections(notes: notes),
+              SliverToBoxAdapter(child: _TaskSections(notes: notes)),
+            const SliverToBoxAdapter(child: SizedBox(height: 110)),
           ],
         ),
       ),

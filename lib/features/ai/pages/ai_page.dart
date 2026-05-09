@@ -60,12 +60,11 @@ class _AiPageState extends ConsumerState<AiPage> {
     return AppScaffold(
       activePath: '/ai',
       child: SafeArea(
-        child: ListView(
+        child: CustomScrollView(
           controller: _scrollController,
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
-          children: [
-            StickyAppBar(
+          slivers: [
+            StickySliverAppBar(
               title: 'AI 便签',
               showSearch: false,
               trailing: IconButton(
@@ -74,93 +73,106 @@ class _AiPageState extends ConsumerState<AiPage> {
                 icon: const Icon(Icons.tune_rounded),
               ),
             ),
-            _HeroPanel(provider: state.config.provider),
-            const SizedBox(height: 12),
-            if (!configured)
-              _ConfigBanner(onTap: () => context.push('/profile/ai-settings')),
-            const SizedBox(height: 14),
-            _ToolGrid(
-              items: [
-                // _AiTool(
-                //   '记录灵感',
-                //   '把零散想法整理成便签',
-                //   Icons.lightbulb_rounded,
-                //   '/ai/note',
-                // ),
-                // _AiTool(
-                //   '生成清单',
-                //   '拆成可执行待办事项',
-                //   Icons.event_note_rounded,
-                //   '/ai/task',
-                // ),
-                // _AiTool(
-                //   '整理重点',
-                //   '提炼会议和对话行动项',
-                //   Icons.auto_fix_high_rounded,
-                //   '/ai/chat',
-                // ),
-                // _AiTool(
-                //   '笔记模板',
-                //   '生成学习或工作模板',
-                //   Icons.note_add_rounded,
-                //   '/ai/note',
-                // ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _PromptPanel(
-              controller: _prompt,
-              generating: state.generating,
-              onChipTap: (text) => _prompt.text = text,
-              onGenerate: _generate,
-            ),
-            if (_visibleGeneratedEntries(state).isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Row(
-                key: _resultKey,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList.list(
                 children: [
-                  const Text(
-                    '生成结果',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  _HeroPanel(provider: state.config.provider),
+                  const SizedBox(height: 12),
+                  if (!configured)
+                    _ConfigBanner(
+                      onTap: () => context.push('/profile/ai-settings'),
+                    ),
+                  const SizedBox(height: 14),
+                  _ToolGrid(
+                    items: [
+                      // _AiTool(
+                      //   '记录灵感',
+                      //   '把零散想法整理成便签',
+                      //   Icons.lightbulb_rounded,
+                      //   '/ai/note',
+                      // ),
+                      // _AiTool(
+                      //   '生成清单',
+                      //   '拆成可执行待办事项',
+                      //   Icons.event_note_rounded,
+                      //   '/ai/task',
+                      // ),
+                      // _AiTool(
+                      //   '整理重点',
+                      //   '提炼会议和对话行动项',
+                      //   Icons.auto_fix_high_rounded,
+                      //   '/ai/chat',
+                      // ),
+                      // _AiTool(
+                      //   '笔记模板',
+                      //   '生成学习或工作模板',
+                      //   Icons.note_add_rounded,
+                      //   '/ai/note',
+                      // ),
+                    ],
                   ),
-                  const Spacer(),
-                  _ResultHeaderAction(
-                    icon: Icons.refresh_rounded,
-                    label: '不满意？重新生成',
-                    onTap: state.generating ? null : _regenerate,
+                  const SizedBox(height: 16),
+                  _PromptPanel(
+                    controller: _prompt,
+                    generating: state.generating,
+                    onChipTap: (text) => _prompt.text = text,
+                    onGenerate: _generate,
                   ),
-                  const SizedBox(width: 6),
-                  _ResultHeaderAction(
-                    icon: Icons.playlist_add_check_rounded,
-                    label: '全部加入任务',
-                    onTap: () => _addAllGenerated(state),
-                  ),
+                  if (_visibleGeneratedEntries(state).isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Row(
+                      key: _resultKey,
+                      children: [
+                        const Text(
+                          '生成结果',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Spacer(),
+                        _ResultHeaderAction(
+                          icon: Icons.refresh_rounded,
+                          label: '不满意？重新生成',
+                          onTap: state.generating ? null : _regenerate,
+                        ),
+                        const SizedBox(width: 6),
+                        _ResultHeaderAction(
+                          icon: Icons.playlist_add_check_rounded,
+                          label: '全部加入任务',
+                          onTap: () => _addAllGenerated(state),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    for (final entry in _visibleGeneratedEntries(state))
+                      _SlideAway(
+                        slideAway: _dismissedResults.contains(entry.key),
+                        child: _GeneratedPlanCard(
+                          title: _titleControllerFor(
+                            entry.key,
+                            entry.value.title,
+                          ).text,
+                          content: _contentControllerFor(
+                            entry.key,
+                            entry.value.content,
+                          ).text,
+                          tag: _selectedTags[entry.key] ?? entry.value.tag,
+                          reminderAt:
+                              _selectedTimes[entry.key] ??
+                              entry.value.reminderAt ??
+                              _fallbackFutureTime(entry.key),
+                          onPickTime: () => _pickPlanTime(entry.key),
+                          onAdd: () => _addOneGenerated(entry),
+                          onEdit: () => _editGeneratedPlan(entry),
+                        ),
+                      ),
+                  ],
+                  const SizedBox(height: 112),
                 ],
               ),
-              const SizedBox(height: 10),
-              for (final entry in _visibleGeneratedEntries(state))
-                _SlideAway(
-                  slideAway: _dismissedResults.contains(entry.key),
-                  child: _GeneratedPlanCard(
-                    title: _titleControllerFor(
-                      entry.key,
-                      entry.value.title,
-                    ).text,
-                    content: _contentControllerFor(
-                      entry.key,
-                      entry.value.content,
-                    ).text,
-                    tag: _selectedTags[entry.key] ?? entry.value.tag,
-                    reminderAt:
-                        _selectedTimes[entry.key] ??
-                        entry.value.reminderAt ??
-                        _fallbackFutureTime(entry.key),
-                    onPickTime: () => _pickPlanTime(entry.key),
-                    onAdd: () => _addOneGenerated(entry),
-                    onEdit: () => _editGeneratedPlan(entry),
-                  ),
-                ),
-            ],
+            ),
           ],
         ),
       ),

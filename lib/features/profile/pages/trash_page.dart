@@ -19,32 +19,51 @@ class TrashPage extends ConsumerWidget {
     return AppScaffold(
       activePath: '/home',
       child: SafeArea(
-        child: ListView(
+        child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
-          children: [
-            const StickyAppBar(title: '回收站', showBack: true, showSearch: false),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.noteYellow.withValues(alpha: 0.42),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primary),
-              ),
-              child: const Text('删除的便签会在这里保留 14 天，之后自动永久清除。'),
+          slivers: [
+            const StickySliverAppBar(
+              title: '回收站',
+              showBack: true,
+              showSearch: false,
             ),
-            const SizedBox(height: 14),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.noteYellow.withValues(alpha: 0.42),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.primary),
+                  ),
+                  child: const Text('删除的便签会在这里保留 14 天，之后自动永久清除。'),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 14)),
             if (notes.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 32),
-                child: EmptyState(
-                  text: '回收站是空的',
-                  icon: Icons.delete_outline_rounded,
-                  height: 140,
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(20, 32, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: EmptyState(
+                    text: '回收站是空的',
+                    icon: Icons.delete_outline_rounded,
+                    height: 140,
+                  ),
                 ),
               )
             else
-              for (final note in notes) _TrashItem(noteId: note.id),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _TrashItem(noteId: notes[index].id),
+                    childCount: notes.length,
+                  ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 112)),
           ],
         ),
       ),

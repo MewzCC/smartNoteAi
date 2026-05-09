@@ -16,66 +16,73 @@ class ProviderGuidePage extends StatelessWidget {
     return AppScaffold(
       activePath: '/home',
       child: SafeArea(
-        child: ListView(
+        child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
-          children: [
-            const StickyAppBar(
+          slivers: [
+            const StickySliverAppBar(
               title: '接入教程',
               showBack: true,
               showSearch: false,
             ),
-            for (final provider in aiProviders)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      provider.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final provider = aiProviders[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    const SizedBox(height: 8),
-                    Text(provider.tip),
-                    const SizedBox(height: 10),
-                    Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => _open(provider.homepage),
-                            child: Text(
-                              provider.homepage,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.accentText,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
+                        Text(
+                          provider.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
-                        IconButton(
-                          tooltip: '复制',
-                          onPressed: () async {
-                            await CopyUtils.copy(provider.homepage);
-                            ToastUtils.show('已复制');
-                          },
-                          icon: const Icon(Icons.copy_rounded),
+                        const SizedBox(height: 8),
+                        Text(provider.tip),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _open(provider.homepage),
+                                child: Text(
+                                  provider.homepage,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.accentText,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: '复制',
+                              onPressed: () async {
+                                await CopyUtils.copy(provider.homepage);
+                                ToastUtils.show('已复制');
+                              },
+                              icon: const Icon(Icons.copy_rounded),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  );
+                }, childCount: aiProviders.length),
               ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 112)),
           ],
         ),
       ),

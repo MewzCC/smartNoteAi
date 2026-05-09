@@ -14,66 +14,77 @@ class ProfilePage extends StatelessWidget {
     return AppScaffold(
       activePath: '/home',
       child: SafeArea(
-        child: ListView(
+        child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 112),
-          children: [
-            const StickyAppBar(title: '我的', showBack: true, showSearch: false),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: AppShadows.card,
-              ),
-              child: const Row(
+          slivers: [
+            const StickySliverAppBar(
+              title: '我的',
+              showBack: true,
+              showSearch: false,
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList.list(
                 children: [
-                  CircleAvatar(radius: 30, child: Text('你')),
-                  SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: AppShadows.card,
+                    ),
+                    child: const Row(
                       children: [
-                        Text(
-                          'Smart Note AI',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
+                        CircleAvatar(radius: 30, child: Text('你')),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Smart Note AI',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text('让每条便签都更有行动感'),
+                            ],
                           ),
                         ),
-                        SizedBox(height: 4),
-                        Text('让每条便签都更有行动感'),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  _ProfileTile(
+                    title: 'AI 服务商设置',
+                    icon: Icons.tune_rounded,
+                    onTap: () => context.push('/profile/ai-settings'),
+                  ),
+                  _ProfileTile(
+                    title: '接入教程',
+                    icon: Icons.menu_book_rounded,
+                    onTap: () => context.push('/profile/provider-guide'),
+                  ),
+                  _ProfileTile(
+                    title: '成就',
+                    icon: Icons.emoji_events_rounded,
+                    onTap: () => context.push('/achievement'),
+                  ),
+                  _ProfileTile(
+                    title: '归档',
+                    icon: Icons.archive_rounded,
+                    onTap: () => context.push('/archive'),
+                  ),
+                  _ProfileTile(
+                    title: '回收站',
+                    icon: Icons.delete_outline_rounded,
+                    onTap: () => context.push('/profile/trash'),
+                  ),
+                  const SizedBox(height: 112),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            _ProfileTile(
-              title: 'AI 服务商设置',
-              icon: Icons.tune_rounded,
-              onTap: () => context.push('/profile/ai-settings'),
-            ),
-            _ProfileTile(
-              title: '接入教程',
-              icon: Icons.menu_book_rounded,
-              onTap: () => context.push('/profile/provider-guide'),
-            ),
-            _ProfileTile(
-              title: '成就',
-              icon: Icons.emoji_events_rounded,
-              onTap: () => context.push('/achievement'),
-            ),
-            _ProfileTile(
-              title: '归档',
-              icon: Icons.archive_rounded,
-              onTap: () => context.push('/archive'),
-            ),
-            _ProfileTile(
-              title: '回收站',
-              icon: Icons.delete_outline_rounded,
-              onTap: () => context.push('/profile/trash'),
             ),
           ],
         ),

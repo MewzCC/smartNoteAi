@@ -25,7 +25,7 @@ class HomePage extends ConsumerWidget {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            const SliverToBoxAdapter(child: StickyAppBar(title: '首页')),
+            const StickySliverAppBar(title: '首页'),
             const SliverPadding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverToBoxAdapter(child: GreetingCard()),

@@ -21,57 +21,81 @@ class CalendarPage extends ConsumerWidget {
     return AppScaffold(
       activePath: '/calendar',
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
-          children: [
-            const StickyAppBar(title: '日历', showSearch: false),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: TableCalendar<NoteModel>(
-                locale: 'zh_CN',
-                focusedDay: selected,
-                firstDay: DateTime(DateTime.now().year - 3),
-                lastDay: DateTime(DateTime.now().year + 3),
-                selectedDayPredicate: (day) => isSameDay(day, selected),
-                onDaySelected: (selectedDay, focusedDay) {
-                  ref
-                      .read(smartNoteProvider.notifier)
-                      .setArchiveDate(selectedDay);
-                },
-                headerStyle: const HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                ),
-                calendarStyle: const CalendarStyle(
-                  selectedDecoration: BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            const StickySliverAppBar(title: '日历', showSearch: false),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  todayDecoration: BoxDecoration(
-                    color: AppColors.notePurple,
-                    shape: BoxShape.circle,
+                  child: TableCalendar<NoteModel>(
+                    locale: 'zh_CN',
+                    focusedDay: selected,
+                    firstDay: DateTime(DateTime.now().year - 3),
+                    lastDay: DateTime(DateTime.now().year + 3),
+                    selectedDayPredicate: (day) => isSameDay(day, selected),
+                    onDaySelected: (selectedDay, focusedDay) {
+                      ref
+                          .read(smartNoteProvider.notifier)
+                          .setArchiveDate(selectedDay);
+                    },
+                    headerStyle: const HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                    ),
+                    calendarStyle: const CalendarStyle(
+                      selectedDecoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      todayDecoration: BoxDecoration(
+                        color: AppColors.notePurple,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 18),
-            Text(
-              '${selected.month}月${selected.day}日',
-              style: const TextStyle(fontWeight: FontWeight.w900),
+            const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  '${selected.month}月${selected.day}日',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
             ),
-            const SizedBox(height: 10),
+            const SliverToBoxAdapter(child: SizedBox(height: 10)),
             if (notes.isEmpty)
-              const EmptyState(
-                text: '这一天没有事项',
-                icon: Icons.event_busy_rounded,
-                height: 110,
+              const SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverToBoxAdapter(
+                  child: EmptyState(
+                    text: '这一天没有事项',
+                    icon: Icons.event_busy_rounded,
+                    height: 110,
+                  ),
+                ),
               )
             else
-              for (final note in notes) _EventCard(note: note),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) => _EventCard(note: notes[index]),
+                    childCount: notes.length,
+                  ),
+                ),
+              ),
+            const SliverToBoxAdapter(child: SizedBox(height: 110)),
           ],
         ),
       ),

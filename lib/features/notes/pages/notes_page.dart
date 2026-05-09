@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/sticky_app_bar.dart';
 import '../../../core/widgets/sticky_card.dart';
 import '../../../core/widgets/sticky_dialog.dart';
+import '../../../core/widgets/sticky_input.dart';
 import '../../../core/widgets/sticky_tag.dart';
 import '../../../data/models/note_model.dart';
 import '../../../shared/components/app_scaffold.dart';
@@ -33,16 +34,41 @@ class NotesPage extends ConsumerStatefulWidget {
 }
 
 class _NotesPageState extends ConsumerState<NotesPage> {
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
   String _selectedTag = '全部';
   _NoteSortType _sortType = _NoteSortType.newest;
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final shouldSearch =
+        GoRouterState.of(context).uri.queryParameters['search'] == '1';
+    if (shouldSearch && !_searching) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _searching = true);
+      });
+    }
     final state = ref.watch(smartNoteProvider);
     final allNotes = state.visibleNotes;
-    final filteredNotes = _selectedTag == '全部'
+    final keyword = _searchController.text.trim().toLowerCase();
+    final tagFilteredNotes = _selectedTag == '全部'
         ? allNotes
         : allNotes.where((note) => note.tag == _selectedTag);
+    final filteredNotes = keyword.isEmpty
+        ? tagFilteredNotes
+        : tagFilteredNotes.where((note) {
+            return note.title.toLowerCase().contains(keyword) ||
+                note.content.toLowerCase().contains(keyword) ||
+                note.tag.toLowerCase().contains(keyword);
+          });
     final notes = _sortedNotes(filteredNotes);
     final tags = <String>{
       '全部',
@@ -64,16 +90,46 @@ class _NotesPageState extends ConsumerState<NotesPage> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(
-              child: StickyAppBar(
-                title: '笔记',
-                showSearch: false,
-                trailing: _SortMenu(
-                  selected: _sortType,
-                  onChanged: (value) => setState(() => _sortType = value),
+            StickySliverAppBar(
+              title: _searching ? '搜索笔记' : '笔记',
+              showSearch: false,
+              trailing: _searching
+                  ? IconButton(
+                      tooltip: '关闭搜索',
+                      onPressed: _closeSearch,
+                      icon: const Icon(Icons.close_rounded),
+                    )
+                  : _NoteHeaderActions(
+                      selected: _sortType,
+                      onSearch: _openSearch,
+                      onSortChanged: (value) =>
+                          setState(() => _sortType = value),
+                    ),
+            ),
+            if (_searching)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                sliver: SliverToBoxAdapter(
+                  child: StickyInput(
+                    controller: _searchController,
+                    focusNode: _searchFocus,
+                    autofocus: true,
+                    hintText: '搜索标题、内容或标签...',
+                    icon: Icons.search_rounded,
+                    suffix: keyword.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: '清空',
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
               ),
-            ),
             SliverToBoxAdapter(
               child: _NoteTags(
                 tags: tags,
@@ -133,6 +189,22 @@ class _NotesPageState extends ConsumerState<NotesPage> {
         ),
       ),
     );
+  }
+
+  void _openSearch() {
+    setState(() => _searching = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    _searchController.clear();
+    _searchFocus.unfocus();
+    setState(() => _searching = false);
+    if (GoRouterState.of(context).uri.queryParameters['search'] == '1') {
+      context.go('/notes');
+    }
   }
 
   List<NoteModel> _sortedNotes(Iterable<NoteModel> source) {
@@ -239,6 +311,72 @@ class _SortMenu extends StatelessWidget {
           border: Border.all(color: AppColors.border),
         ),
         child: const Icon(Icons.sort_rounded, color: AppColors.textPrimary),
+      ),
+    );
+  }
+}
+
+class _NoteHeaderActions extends StatelessWidget {
+  const _NoteHeaderActions({
+    required this.selected,
+    required this.onSearch,
+    required this.onSortChanged,
+  });
+
+  final _NoteSortType selected;
+  final VoidCallback onSearch;
+  final ValueChanged<_NoteSortType> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      height: 44,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          _HeaderCircleButton(
+            tooltip: '搜索',
+            icon: Icons.search_rounded,
+            onTap: onSearch,
+          ),
+          const SizedBox(width: 8),
+          _SortMenu(selected: selected, onChanged: onSortChanged),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderCircleButton extends StatelessWidget {
+  const _HeaderCircleButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Container(
+          width: 42,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.64),
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Icon(icon, color: AppColors.textPrimary),
+        ),
       ),
     );
   }
