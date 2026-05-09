@@ -1,0 +1,72 @@
+name: Build macOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: GitHub release tag to upload the macOS build to
+        required: true
+        default: note
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable macOS desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          VERSION_LINE="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          VERSION_NAME="${VERSION_LINE%%+*}"
+          BUILD_NUMBER="${VERSION_LINE##*+}"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Use ad-hoc signing for CI build
+        shell: bash
+        run: |
+          ruby -0pi -e 'gsub(/CODE_SIGN_STYLE = Automatic;/, "CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = \"-\";")' macos/Runner.xcodeproj/project.pbxproj
+
+      - name: Build macOS app
+        run: flutter build macos --release --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER"
+
+      - name: Package macOS app
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found under build/macos/Build/Products/Release" >&2
+            exit 1
+          fi
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "artifacts/SmartNote-v${VERSION_NAME}-macos.zip"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartNote-v${{ env.VERSION_NAME }}-macos
+          path: artifacts/SmartNote-v${{ env.VERSION_NAME }}-macos.zip
+
+      - name: Upload to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          files: artifacts/SmartNote-v${{ env.VERSION_NAME }}-macos.zip
+          fail_on_unmatched_files: true
