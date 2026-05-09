@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_utils.dart';
+import '../../../core/utils/toast_utils.dart';
+import '../../../core/widgets/sticky_dialog.dart';
 import '../../../data/models/note_model.dart';
 import '../../../shared/components/empty_state.dart';
 import '../../../shared/helpers/checklist_helper.dart';
@@ -52,11 +54,12 @@ class TodayTaskSection extends ConsumerWidget {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   value: note.done,
-                  onChanged: note.done || canComplete
-                      ? (_) => ref
-                            .read(smartNoteProvider.notifier)
-                            .toggleDone(note.id)
-                      : null,
+                  onChanged: (_) => _handleTaskTap(
+                    context: context,
+                    ref: ref,
+                    note: note,
+                    canComplete: canComplete,
+                  ),
                   title: Text(
                     note.title,
                     maxLines: 1,
@@ -78,5 +81,21 @@ class TodayTaskSection extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _handleTaskTap({
+    required BuildContext context,
+    required WidgetRef ref,
+    required NoteModel note,
+    required bool canComplete,
+  }) async {
+    if (!canComplete) {
+      ToastUtils.show('完成所有待办后才可以标记完成');
+      return;
+    }
+
+    final ok = await StickyDialog.confirmCompleteTask(context, note.title);
+    if (!ok || !context.mounted) return;
+    await ref.read(smartNoteProvider.notifier).toggleDone(note.id);
   }
 }

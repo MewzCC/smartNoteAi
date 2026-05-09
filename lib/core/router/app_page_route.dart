@@ -1,3 +1,4 @@
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
 PageRouteBuilder<T> buildAppPageRoute<T>({
@@ -5,36 +6,29 @@ PageRouteBuilder<T> buildAppPageRoute<T>({
   AxisDirection axis = AxisDirection.left,
 }) {
   return PageRouteBuilder<T>(
-    transitionDuration: const Duration(milliseconds: 320),
-    reverseTransitionDuration: const Duration(milliseconds: 240),
+    transitionDuration: const Duration(milliseconds: 380),
+    reverseTransitionDuration: const Duration(milliseconds: 280),
     pageBuilder: (context, animation, secondaryAnimation) => child,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final isMobile = MediaQuery.sizeOf(context).width < 600;
+      if (isMobile) {
+        return SharedAxisTransition(
+          animation: animation,
+          secondaryAnimation: secondaryAnimation,
+          transitionType: axis == AxisDirection.up
+              ? SharedAxisTransitionType.vertical
+              : SharedAxisTransitionType.horizontal,
+          fillColor: Colors.transparent,
+          child: child,
+        );
+      }
+
       final curved = CurvedAnimation(
         parent: animation,
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       );
-      final offset = _beginOffset(axis);
-
-      return FadeTransition(
-        opacity: Tween<double>(begin: 0, end: 1).animate(curved),
-        child: SlideTransition(
-          position: Tween<Offset>(
-            begin: offset,
-            end: Offset.zero,
-          ).animate(curved),
-          child: child,
-        ),
-      );
+      return FadeScaleTransition(animation: curved, child: child);
     },
   );
-}
-
-Offset _beginOffset(AxisDirection axis) {
-  return switch (axis) {
-    AxisDirection.up => const Offset(0, 0.08),
-    AxisDirection.down => const Offset(0, -0.08),
-    AxisDirection.left => const Offset(0.08, 0),
-    AxisDirection.right => const Offset(-0.08, 0),
-  };
 }

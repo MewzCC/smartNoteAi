@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/ai_client.dart';
+import '../../../core/router/app_page_route.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_shadows.dart';
 import '../../../core/utils/date_utils.dart';
@@ -123,10 +124,16 @@ class _AiPageState extends ConsumerState<AiPage> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => _addAllGenerated(state),
-                    icon: const Icon(Icons.playlist_add_check_rounded),
-                    label: const Text('全部加入任务'),
+                  _ResultHeaderAction(
+                    icon: Icons.refresh_rounded,
+                    label: '不满意？重新生成',
+                    onTap: state.generating ? null : _regenerate,
+                  ),
+                  const SizedBox(width: 6),
+                  _ResultHeaderAction(
+                    icon: Icons.playlist_add_check_rounded,
+                    label: '全部加入任务',
+                    onTap: () => _addAllGenerated(state),
                   ),
                 ],
               ),
@@ -198,6 +205,14 @@ class _AiPageState extends ConsumerState<AiPage> {
     }
   }
 
+  Future<void> _regenerate() async {
+    if (_prompt.text.trim().isEmpty) {
+      ToastUtils.show('请先输入你的想法或者需求');
+      return;
+    }
+    await _generate();
+  }
+
   Future<void> _scrollToResult() async {
     final context = _resultKey.currentContext;
     if (context == null) return;
@@ -212,8 +227,9 @@ class _AiPageState extends ConsumerState<AiPage> {
   Future<void> _pickPlanTime(int index) async {
     final current = _selectedTimes[index] ?? _fallbackFutureTime(index);
     final result = await Navigator.of(context).push<NoteReminderResult>(
-      MaterialPageRoute(
-        builder: (context) => NoteReminderPage(initialTime: current),
+      buildAppPageRoute(
+        child: NoteReminderPage(initialTime: current),
+        axis: AxisDirection.up,
       ),
     );
     if (result == null || !mounted) return;
@@ -292,8 +308,8 @@ class _AiPageState extends ConsumerState<AiPage> {
 
   Future<void> _editGeneratedPlan(MapEntry<int, GeneratedPlan> entry) async {
     final result = await Navigator.of(context).push<_GeneratedEditResult>(
-      MaterialPageRoute(
-        builder: (context) => _GeneratedPlanEditorPage(
+      buildAppPageRoute(
+        child: _GeneratedPlanEditorPage(
           initialTitle: _titleControllerFor(entry.key, entry.value.title).text,
           initialContent: _contentControllerFor(
             entry.key,
@@ -308,6 +324,7 @@ class _AiPageState extends ConsumerState<AiPage> {
           initialTag: _selectedTags[entry.key] ?? entry.value.tag,
           initialIsTask: _selectedTaskFlags[entry.key] ?? true,
         ),
+        axis: AxisDirection.up,
       ),
     );
     if (result == null || !mounted) return;
@@ -335,7 +352,8 @@ class _AiPageState extends ConsumerState<AiPage> {
           tag: _selectedTags[entry.key] ?? entry.value.tag,
           isTask: _selectedTaskFlags[entry.key] ?? true,
         );
-    setState(() => _dismissedResults.add(entry.key));
+    ref.read(smartNoteProvider.notifier).removeGeneratedPlanAt(entry.key);
+    _clearGeneratedEditors();
     ToastUtils.show('已加入任务');
   }
 
@@ -356,10 +374,49 @@ class _AiPageState extends ConsumerState<AiPage> {
             isTask: _selectedTaskFlags[entry.key] ?? true,
           );
     }
-    setState(() {
-      _dismissedResults.addAll(entries.map((entry) => entry.key));
-    });
+    ref.read(smartNoteProvider.notifier).clearGeneratedPlans();
+    _clearGeneratedEditors();
     ToastUtils.show('已全部加入任务');
+  }
+}
+
+class _ResultHeaderAction extends StatelessWidget {
+  const _ResultHeaderAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final color = enabled ? AppColors.accentText : AppColors.textSecondary;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 17, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -678,8 +735,9 @@ class _GeneratedPlanEditorPageState
 
   Future<void> _pickReminder() async {
     final result = await Navigator.of(context).push<NoteReminderResult>(
-      MaterialPageRoute(
-        builder: (context) => NoteReminderPage(initialTime: _reminderAt),
+      buildAppPageRoute(
+        child: NoteReminderPage(initialTime: _reminderAt),
+        axis: AxisDirection.up,
       ),
     );
     if (result == null || !mounted) return;

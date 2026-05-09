@@ -62,6 +62,18 @@ if ($Preview) {
     exit 0
 }
 
+$androidKeyPropertiesPath = Join-Path $projectRoot 'android\key.properties'
+if (-not $NoBuild -and -not (Test-Path $androidKeyPropertiesPath)) {
+    throw @"
+Release signing config was not found: android\key.properties
+
+Create a fixed release keystore before building:
+1. Copy android\key.properties.example to android\key.properties
+2. Generate android\app\smartnote-release.jks with keytool
+3. Keep both files private and backed up
+"@
+}
+
 $nextContent = [regex]::Replace($content, $versionPattern, $nextVersionLine, 1)
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($pubspecPath, $nextContent, $utf8NoBom)

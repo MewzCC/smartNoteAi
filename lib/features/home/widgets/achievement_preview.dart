@@ -32,7 +32,7 @@ class AchievementPreview extends StatelessWidget {
         itemBuilder: (context, index) {
           final item = badgesData[index];
           return InkWell(
-            onTap: () => context.push('/achievements'),
+            onTap: () => context.push('/achievement'),
             child: Container(
               width: 82,
               padding: const EdgeInsets.all(10),

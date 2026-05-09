@@ -2,7 +2,7 @@ name: smart_note_ai
 description: "智能便签跨平台应用"
 publish_to: 'none'
 
-version: 1.0.3+3
+version: 1.0.4+4
 environment:
   sdk: ^3.11.5
 

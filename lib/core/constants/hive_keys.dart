@@ -3,4 +3,5 @@ class HiveKeys {
   static const configBox = 'config_box';
   static const notesList = 'notes_list';
   static const userConfig = 'user_config';
+  static const achievementStats = 'achievement_stats';
 }

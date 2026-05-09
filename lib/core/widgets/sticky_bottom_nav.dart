@@ -73,36 +73,62 @@ class _NavItem extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.small),
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 58,
-        height: 58,
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.primary.withValues(alpha: 0.78)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadius.small),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (spec.asset == null)
-              Icon(spec.icon, size: 24)
-            else
-              ClipOval(
-                child: Image.asset(
-                  spec.asset!,
-                  width: 26,
-                  height: 26,
-                  fit: BoxFit.cover,
-                ),
+      child: AnimatedScale(
+        scale: active ? 1.04 : 0.96,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          width: 58,
+          height: 58,
+          transform: Matrix4.translationValues(0, active ? -3 : 0, 0),
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.primary.withValues(alpha: 0.82)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.small),
+            boxShadow: active
+                ? const [
+                    BoxShadow(
+                      color: AppColors.cardShadow,
+                      blurRadius: 10,
+                      offset: Offset(0, 5),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedScale(
+                scale: active ? 1.08 : 1,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: spec.asset == null
+                    ? Icon(spec.icon, size: 24)
+                    : ClipOval(
+                        child: Image.asset(
+                          spec.asset!,
+                          width: 26,
+                          height: 26,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
               ),
-            const SizedBox(height: 3),
-            Text(
-              spec.label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
-            ),
-          ],
+              const SizedBox(height: 3),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  color: active ? AppColors.accentText : AppColors.textPrimary,
+                ),
+                child: Text(spec.label),
+              ),
+            ],
+          ),
         ),
       ),
     );

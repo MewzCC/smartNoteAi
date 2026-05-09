@@ -325,17 +325,108 @@ class _DetailHeader extends StatelessWidget {
               alignment: Alignment.centerRight,
               child: PopupMenuButton<String>(
                 tooltip: '更多',
-                icon: const Icon(Icons.more_horiz_rounded),
+                color: const Color(0xFFFFFBED),
+                surfaceTintColor: Colors.transparent,
+                elevation: 8,
+                shadowColor: AppColors.cardShadow,
+                position: PopupMenuPosition.under,
+                offset: const Offset(0, 8),
+                constraints: const BoxConstraints(minWidth: 132),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: AppColors.border),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 onSelected: onSelected,
                 itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'edit', child: Text('编辑')),
-                  PopupMenuItem(value: 'archive', child: Text('归档')),
-                  PopupMenuItem(value: 'delete', child: Text('删除')),
+                  PopupMenuItem(
+                    value: 'edit',
+                    height: 46,
+                    padding: EdgeInsets.zero,
+                    child: _DetailMenuItem(
+                      icon: Icons.edit_rounded,
+                      label: '编辑',
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'archive',
+                    height: 46,
+                    padding: EdgeInsets.zero,
+                    child: _DetailMenuItem(
+                      icon: Icons.archive_outlined,
+                      label: '归档',
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    height: 46,
+                    padding: EdgeInsets.zero,
+                    child: _DetailMenuItem(
+                      icon: Icons.delete_outline_rounded,
+                      label: '删除',
+                      color: AppColors.danger,
+                    ),
+                  ),
                 ],
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF6D6),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: AppColors.cardShadow,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.more_horiz_rounded,
+                    size: 24,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DetailMenuItem extends StatelessWidget {
+  const _DetailMenuItem({
+    required this.icon,
+    required this.label,
+    this.color = AppColors.textPrimary,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Icon(icon, size: 19, color: color),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

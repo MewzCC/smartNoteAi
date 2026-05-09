@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/ai_client.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../core/utils/device_utils.dart';
+import '../../../data/models/achievement_stats_model.dart';
 import '../../../data/models/note_model.dart';
 import '../../../data/models/user_config_model.dart';
+import '../../../data/repositories/achievement_stats_repository.dart';
 import '../../../data/repositories/ai_repository.dart';
 import '../../../data/repositories/note_repository.dart';
 import '../../../data/repositories/user_repository.dart';
@@ -17,6 +19,7 @@ class SmartNoteState {
     required this.notes,
     required this.config,
     required this.archiveDate,
+    required this.achievementStats,
     this.generatedPlans = const [],
     this.generating = false,
   });
@@ -24,6 +27,7 @@ class SmartNoteState {
   final List<NoteModel> notes;
   final UserConfigModel config;
   final DateTime archiveDate;
+  final AchievementStatsModel achievementStats;
   final List<GeneratedPlan> generatedPlans;
   final bool generating;
 
@@ -83,6 +87,7 @@ class SmartNoteState {
     List<NoteModel>? notes,
     UserConfigModel? config,
     DateTime? archiveDate,
+    AchievementStatsModel? achievementStats,
     List<GeneratedPlan>? generatedPlans,
     bool? generating,
   }) {
@@ -90,6 +95,7 @@ class SmartNoteState {
       notes: notes ?? this.notes,
       config: config ?? this.config,
       archiveDate: archiveDate ?? this.archiveDate,
+      achievementStats: achievementStats ?? this.achievementStats,
       generatedPlans: generatedPlans ?? this.generatedPlans,
       generating: generating ?? this.generating,
     );
@@ -100,6 +106,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
   final _notes = NoteRepository();
   final _user = UserRepository();
   final _ai = const AiRepository();
+  final _achievementStats = AchievementStatsRepository();
 
   @override
   SmartNoteState build() {
@@ -107,6 +114,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
       notes: _notes.loadNotes(),
       config: _user.loadConfig(),
       archiveDate: DateTime.now(),
+      achievementStats: _achievementStats.loadStats(),
     );
   }
 
@@ -134,6 +142,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     );
     await _persist([...state.notes, note]);
     await NotificationService.instance.schedule(note);
+    await _recordNoteCreated(done && isTask);
   }
 
   Future<void> addGeneratedPlans() async {
@@ -152,6 +161,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     for (final note in created) {
       await NotificationService.instance.schedule(note);
     }
+    await _recordNotesCreated(created.length);
   }
 
   Future<void> addGeneratedPlan(
@@ -171,6 +181,7 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     );
     await _persist([...state.notes, created]);
     await NotificationService.instance.schedule(created);
+    await _recordNoteCreated(false);
   }
 
   Future<void> updateNote(NoteModel note) async {
@@ -195,6 +206,9 @@ class SmartNoteController extends Notifier<SmartNoteState> {
         if (item.id == id) item.copyWith(done: nextDone) else item,
     ];
     await _persist(next);
+    if (nextDone) {
+      await _recordTaskCompleted();
+    }
     return true;
   }
 
@@ -279,9 +293,46 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     }
   }
 
+  void clearGeneratedPlans() {
+    state = state.copyWith(generatedPlans: []);
+  }
+
+  void removeGeneratedPlanAt(int index) {
+    if (index < 0 || index >= state.generatedPlans.length) return;
+    final plans = [...state.generatedPlans]..removeAt(index);
+    state = state.copyWith(generatedPlans: plans);
+  }
+
   Future<void> _persist(List<NoteModel> notes) async {
     await _notes.saveNotes(notes);
     state = state.copyWith(notes: notes);
+  }
+
+  Future<void> _recordNoteCreated(bool completedTask) async {
+    var next = state.achievementStats.recordNoteCreated();
+    if (completedTask) {
+      next = next.recordTaskCompleted();
+    }
+    await _saveAchievementStats(next);
+  }
+
+  Future<void> _recordNotesCreated(int count) async {
+    if (count <= 0) return;
+    var next = state.achievementStats;
+    for (var index = 0; index < count; index++) {
+      next = next.recordNoteCreated();
+    }
+    await _saveAchievementStats(next);
+  }
+
+  Future<void> _recordTaskCompleted() async {
+    final next = state.achievementStats.recordTaskCompleted();
+    await _saveAchievementStats(next);
+  }
+
+  Future<void> _saveAchievementStats(AchievementStatsModel stats) async {
+    await _achievementStats.saveStats(stats);
+    state = state.copyWith(achievementStats: stats);
   }
 }
 

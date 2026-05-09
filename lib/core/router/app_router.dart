@@ -2,6 +2,7 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../theme/app_colors.dart';
 import '../../features/achievements/achievement_page.dart';
 import '../../features/ai/pages/ai_chat_page.dart';
 import '../../features/ai/pages/ai_generate_note_page.dart';
@@ -50,6 +51,7 @@ final appRouter = GoRouter(
     _route('/ai/task', const AiGenerateTaskPage()),
     _route('/ai/note', const AiGenerateNotePage()),
     _route('/achievement', const AchievementPage()),
+    _route('/achievements', const AchievementPage()),
     _route('/archive', const ArchivePage()),
     _route('/profile', const ProfilePage()),
     _route('/profile/ai-settings', const AiSettingsPage()),
@@ -70,16 +72,35 @@ CustomTransitionPage<void> _page(GoRouterState state, Widget child) {
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 260),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionDuration: const Duration(milliseconds: 390),
+    reverseTransitionDuration: const Duration(milliseconds: 300),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final isMobile = MediaQuery.sizeOf(context).width < 600;
       if (isMobile) {
-        return _MobilePageTransition(
+        if (_isPrimaryDestination(path)) {
+          return SharedAxisTransition(
+            animation: animation,
+            secondaryAnimation: secondaryAnimation,
+            transitionType: SharedAxisTransitionType.horizontal,
+            fillColor: AppColors.background,
+            child: child,
+          );
+        }
+
+        if (_isInputFlow(path)) {
+          return SharedAxisTransition(
+            animation: animation,
+            secondaryAnimation: secondaryAnimation,
+            transitionType: SharedAxisTransitionType.vertical,
+            fillColor: AppColors.background,
+            child: child,
+          );
+        }
+
+        return FadeThroughTransition(
           animation: animation,
-          axis: _isPrimaryDestination(path)
-              ? AxisDirection.left
-              : AxisDirection.up,
+          secondaryAnimation: secondaryAnimation,
+          fillColor: AppColors.background,
           child: child,
         );
       }
@@ -89,7 +110,7 @@ CustomTransitionPage<void> _page(GoRouterState state, Widget child) {
           animation: animation,
           secondaryAnimation: secondaryAnimation,
           transitionType: SharedAxisTransitionType.horizontal,
-          fillColor: Colors.transparent,
+          fillColor: AppColors.background,
           child: child,
         );
       }
@@ -99,7 +120,7 @@ CustomTransitionPage<void> _page(GoRouterState state, Widget child) {
           animation: animation,
           secondaryAnimation: secondaryAnimation,
           transitionType: SharedAxisTransitionType.vertical,
-          fillColor: Colors.transparent,
+          fillColor: AppColors.background,
           child: child,
         );
       }
@@ -107,52 +128,11 @@ CustomTransitionPage<void> _page(GoRouterState state, Widget child) {
       return FadeThroughTransition(
         animation: animation,
         secondaryAnimation: secondaryAnimation,
-        fillColor: Colors.transparent,
+        fillColor: AppColors.background,
         child: child,
       );
     },
   );
-}
-
-class _MobilePageTransition extends StatelessWidget {
-  const _MobilePageTransition({
-    required this.animation,
-    required this.axis,
-    required this.child,
-  });
-
-  final Animation<double> animation;
-  final AxisDirection axis;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-
-    return FadeTransition(
-      opacity: Tween<double>(begin: 0, end: 1).animate(curved),
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: _mobileBeginOffset(axis),
-          end: Offset.zero,
-        ).animate(curved),
-        child: child,
-      ),
-    );
-  }
-}
-
-Offset _mobileBeginOffset(AxisDirection axis) {
-  return switch (axis) {
-    AxisDirection.up => const Offset(0, 0.10),
-    AxisDirection.down => const Offset(0, -0.10),
-    AxisDirection.left => const Offset(0.10, 0),
-    AxisDirection.right => const Offset(-0.10, 0),
-  };
 }
 
 bool _isPrimaryDestination(String path) {

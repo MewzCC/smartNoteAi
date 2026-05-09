@@ -72,9 +72,9 @@ class HomePage extends ConsumerWidget {
             ),
             SliverToBoxAdapter(
               child: AchievementPreview(
-                doneCount: state.doneCount,
-                streak: state.currentStreak,
-                activeDays: state.activeDays,
+                doneCount: state.achievementStats.doneTasks,
+                streak: state.achievementStats.currentStreak,
+                activeDays: state.achievementStats.activeDays,
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 108)),
