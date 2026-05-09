@@ -61,8 +61,10 @@ flutter run
 🌐 运行到 Web：
 
 ```bash
-flutter run -d chrome
+powershell -ExecutionPolicy Bypass -File scripts/run_web.ps1
 ```
+
+默认 Web 地址固定为 `http://127.0.0.1:3000`。
 
 📱 运行到 Android 真机：
 
@@ -83,11 +85,19 @@ flutter test
 flutter build apk --debug
 ```
 
-📦 构建发布 APK：
+---
 
-```bash
-flutter build apk --release
-```
+### 📦 发布 APK 构建（自动自增版本号）
+
+项目提供了 PowerShell 脚本 `scripts/build_apk.ps1`，每次构建会自动将 `pubspec.yaml` 中的构建号（`+N`）自增 1，保证每个 APK 包的版本唯一。
+
+| 命令 | 说明 |
+|------|------|
+| `.\scripts\build_apk.ps1` | 自增版本号 + 执行 `flutter build apk --release` |
+| `.\scripts\build_apk.ps1 -Preview` | 仅预览下一个版本号，不修改文件、不构建 |
+| `.\scripts\build_apk.ps1 -NoBuild` | 仅更新版本号，不构建 APK |
+
+> 版本号格式说明：`pubspec.yaml` 中 `version: 1.0.0+2`，`1.0.0` 为语义化版本名，`2` 为构建号。脚本自动将构建号 +1。
 
 📁 构建产物位置：
 

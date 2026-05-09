@@ -66,17 +66,102 @@ GoRoute _route(String path, Widget child) {
 }
 
 CustomTransitionPage<void> _page(GoRouterState state, Widget child) {
+  final path = state.uri.path;
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 280),
+    transitionDuration: const Duration(milliseconds: 260),
     reverseTransitionDuration: const Duration(milliseconds: 220),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final isMobile = MediaQuery.sizeOf(context).width < 600;
+      if (isMobile) {
+        return _MobilePageTransition(
+          animation: animation,
+          axis: _isPrimaryDestination(path)
+              ? AxisDirection.left
+              : AxisDirection.up,
+          child: child,
+        );
+      }
+
+      if (_isPrimaryDestination(path)) {
+        return SharedAxisTransition(
+          animation: animation,
+          secondaryAnimation: secondaryAnimation,
+          transitionType: SharedAxisTransitionType.horizontal,
+          fillColor: Colors.transparent,
+          child: child,
+        );
+      }
+
+      if (_isInputFlow(path)) {
+        return SharedAxisTransition(
+          animation: animation,
+          secondaryAnimation: secondaryAnimation,
+          transitionType: SharedAxisTransitionType.vertical,
+          fillColor: Colors.transparent,
+          child: child,
+        );
+      }
+
       return FadeThroughTransition(
         animation: animation,
         secondaryAnimation: secondaryAnimation,
+        fillColor: Colors.transparent,
         child: child,
       );
     },
   );
+}
+
+class _MobilePageTransition extends StatelessWidget {
+  const _MobilePageTransition({
+    required this.animation,
+    required this.axis,
+    required this.child,
+  });
+
+  final Animation<double> animation;
+  final AxisDirection axis;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0, end: 1).animate(curved),
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: _mobileBeginOffset(axis),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
+    );
+  }
+}
+
+Offset _mobileBeginOffset(AxisDirection axis) {
+  return switch (axis) {
+    AxisDirection.up => const Offset(0, 0.10),
+    AxisDirection.down => const Offset(0, -0.10),
+    AxisDirection.left => const Offset(0.10, 0),
+    AxisDirection.right => const Offset(-0.10, 0),
+  };
+}
+
+bool _isPrimaryDestination(String path) {
+  return const {'/home', '/notes', '/ai', '/tasks', '/calendar'}.contains(path);
+}
+
+bool _isInputFlow(String path) {
+  return path == '/notes/new' ||
+      path.startsWith('/notes/') ||
+      path.startsWith('/ai/') ||
+      path.startsWith('/profile/');
 }

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/router/app_page_route.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/date_utils.dart';
 import '../../../features/home/provider/home_provider.dart';
 import '../../../shared/components/paper_background.dart';
 import '../../../shared/enums/note_color.dart';
+import '../../../shared/helpers/checklist_helper.dart';
+import 'note_reminder_page.dart';
 import '../widgets/note_checklist_content.dart';
 
 class NoteDetailPage extends ConsumerWidget {
@@ -27,6 +30,7 @@ class NoteDetailPage extends ConsumerWidget {
 
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final cardHeight = (viewportHeight - 190).clamp(430.0, 640.0);
+    final canComplete = canCompleteTaskContent(note.content);
 
     return Scaffold(
       body: PaperBackground(
@@ -107,6 +111,15 @@ class NoteDetailPage extends ConsumerWidget {
                                               .updateNote(
                                                 note.copyWith(
                                                   content: nextContent,
+                                                  done:
+                                                      note.isTask &&
+                                                          hasChecklistLines(
+                                                            nextContent,
+                                                          )
+                                                      ? areChecklistLinesComplete(
+                                                          nextContent,
+                                                        )
+                                                      : note.done,
                                                 ),
                                               );
                                         },
@@ -115,23 +128,25 @@ class NoteDetailPage extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 16),
                                   Wrap(
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
                                     spacing: 8,
                                     runSpacing: 8,
                                     children: [
-                                      Chip(label: Text(note.tag)),
+                                      _StatusMeta(
+                                        icon: Icons.sell_outlined,
+                                        label: note.tag,
+                                      ),
                                       if (note.isTask)
-                                        Chip(
-                                          avatar: Icon(
-                                            note.done
-                                                ? Icons.check_box_rounded
-                                                : Icons
-                                                      .check_box_outline_blank_rounded,
-                                            size: 16,
-                                          ),
-                                          label: Text(note.done ? '已完成' : '任务'),
+                                        _StatusMeta(
+                                          icon: note.done
+                                              ? Icons.check_box_rounded
+                                              : Icons
+                                                    .check_box_outline_blank_rounded,
+                                          label: note.done ? '已完成' : '任务',
                                         ),
                                       if (note.reminderAt != null)
-                                        Chip(
+                                        ActionChip(
                                           avatar: const Icon(
                                             Icons.alarm_rounded,
                                             size: 16,
@@ -139,6 +154,32 @@ class NoteDetailPage extends ConsumerWidget {
                                           label: Text(
                                             formatFullTime(note.reminderAt!),
                                           ),
+                                          onPressed: () async {
+                                            final result =
+                                                await Navigator.of(
+                                                  context,
+                                                ).push<NoteReminderResult>(
+                                                  buildAppPageRoute(
+                                                    child: NoteReminderPage(
+                                                      initialTime:
+                                                          note.reminderAt,
+                                                    ),
+                                                    axis: AxisDirection.up,
+                                                  ),
+                                                );
+                                            if (result == null) return;
+                                            await ref
+                                                .read(
+                                                  smartNoteProvider.notifier,
+                                                )
+                                                .updateNote(
+                                                  note.copyWith(
+                                                    reminderAt: result.time,
+                                                    clearReminder:
+                                                        !result.enabled,
+                                                  ),
+                                                );
+                                          },
                                         ),
                                     ],
                                   ),
@@ -146,9 +187,13 @@ class NoteDetailPage extends ConsumerWidget {
                                     const SizedBox(height: 12),
                                     InkWell(
                                       borderRadius: BorderRadius.circular(12),
-                                      onTap: () => ref
-                                          .read(smartNoteProvider.notifier)
-                                          .toggleDone(note.id),
+                                      onTap: note.done || canComplete
+                                          ? () => ref
+                                                .read(
+                                                  smartNoteProvider.notifier,
+                                                )
+                                                .toggleDone(note.id)
+                                          : null,
                                       child: Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
@@ -169,7 +214,13 @@ class NoteDetailPage extends ConsumerWidget {
                                               color: AppColors.success,
                                             ),
                                             const SizedBox(width: 8),
-                                            Text(note.done ? '已完成' : '标记为完成'),
+                                            Text(
+                                              note.done
+                                                  ? '已完成'
+                                                  : canComplete
+                                                  ? '标记为完成'
+                                                  : '完成所有待办后可标记',
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -209,26 +260,23 @@ class NoteDetailPage extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: SizedBox(
                   height: 52,
-                  child: Stack(
-                    alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Center(
-                        child: _BottomTool(
-                          icon: Icons.edit_rounded,
-                          onTap: () => context.push('/notes/$noteId/edit'),
-                        ),
+                      _BottomTool(
+                        icon: Icons.edit_rounded,
+                        tooltip: '编辑',
+                        onTap: () => context.push('/notes/$noteId/edit'),
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _BottomTool(
-                          icon: Icons.delete_outline_rounded,
-                          onTap: () async {
-                            await ref
-                                .read(smartNoteProvider.notifier)
-                                .deleteNote(noteId);
-                            if (context.mounted) context.pop();
-                          },
-                        ),
+                      _BottomTool(
+                        icon: Icons.delete_outline_rounded,
+                        tooltip: '删除',
+                        onTap: () async {
+                          await ref
+                              .read(smartNoteProvider.notifier)
+                              .deleteNote(noteId);
+                          if (context.mounted) context.pop();
+                        },
                       ),
                     ],
                   ),
@@ -293,14 +341,55 @@ class _DetailHeader extends StatelessWidget {
   }
 }
 
-class _BottomTool extends StatelessWidget {
-  const _BottomTool({required this.icon, required this.onTap});
+class _StatusMeta extends StatelessWidget {
+  const _StatusMeta({required this.icon, required this.label});
 
   final IconData icon;
-  final VoidCallback onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.filledTonal(onPressed: onTap, icon: Icon(icon));
+    return SizedBox(
+      height: 40,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomTool extends StatelessWidget {
+  const _BottomTool({
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final String tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 52,
+      child: IconButton.filledTonal(
+        tooltip: tooltip,
+        onPressed: onTap,
+        icon: Icon(icon),
+      ),
+    );
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 
+import '../../../core/router/app_page_route.dart';
 import '../../../core/utils/copy_utils.dart';
 import '../../../core/utils/toast_utils.dart';
 import '../../../core/widgets/sticky_input.dart';
@@ -12,6 +13,7 @@ import '../../../features/home/provider/home_provider.dart';
 import '../../../shared/components/paper_background.dart';
 import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
+import '../../../shared/helpers/checklist_helper.dart';
 import '../pages/note_preview_page.dart';
 import '../pages/note_reminder_page.dart';
 import '../widgets/note_ai_write_panel.dart';
@@ -62,7 +64,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
               .where((item) => item.id == widget.noteId)
               .firstOrNull;
     _title = TextEditingController(text: note?.title ?? '');
-    _content = TextEditingController(text: note?.content ?? '');
+    _content = TextEditingController(
+      text: stripInlineReminderTextFromContent(note?.content ?? ''),
+    );
     _newTag = TextEditingController();
     _aiPrompt = TextEditingController();
     _reminderAt = note?.reminderAt;
@@ -171,12 +175,18 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('完成状态'),
-                      subtitle: const Text('已完成会置灰并显示删除线'),
+                      subtitle: Text(
+                        canCompleteTaskContent(_content.text)
+                            ? '已完成会置灰并显示删除线'
+                            : '完成所有待办后可标记',
+                      ),
                       value: _done,
-                      onChanged: (value) {
-                        setState(() => _done = value);
-                        _scheduleAutoSave();
-                      },
+                      onChanged: _done || canCompleteTaskContent(_content.text)
+                          ? (value) {
+                              setState(() => _done = value);
+                              _scheduleAutoSave();
+                            }
+                          : null,
                     ),
                 ],
               ),
@@ -189,8 +199,9 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
 
   Future<void> _openReminderPage() async {
     final result = await Navigator.of(context).push<NoteReminderResult>(
-      MaterialPageRoute(
-        builder: (context) => NoteReminderPage(initialTime: _reminderAt),
+      buildAppPageRoute(
+        child: NoteReminderPage(initialTime: _reminderAt),
+        axis: AxisDirection.up,
       ),
     );
     if (result == null || !mounted) return;
@@ -234,37 +245,26 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     showMaterialModalBottomSheet<void>(
       context: context,
       builder: (sheetContext) => NoteChecklistEditor(
-        onInsertChecklist: () {
-          Navigator.pop(sheetContext);
-          _insertChecklistTemplate();
-        },
-        onAppendTodo: () {
-          Navigator.pop(sheetContext);
-          _appendChecklistTodo();
-        },
+        initialReminderAt: _reminderAt,
+        onCreateTodo: _createTodoFromPanel,
       ),
     );
   }
 
-  void _insertChecklistTemplate() {
-    _markAsTask();
-    _appendContent(['☐ 待完成事项一', '☐ 待完成事项二', '☐ 待完成事项三'].join('\n'));
-    ToastUtils.show('已添加可勾选待办清单');
-  }
-
-  void _appendChecklistTodo() {
-    _markAsTask();
-    _appendContent('☐ 新待办事项');
-    ToastUtils.show('已添加一条可勾选待办');
-  }
-
-  void _markAsTask() {
+  void _createTodoFromPanel(String content, DateTime? reminderAt) {
     setState(() {
       _isTask = true;
       _done = false;
+      _reminderAt = reminderAt;
+      if (_title.text.trim().isEmpty || _title.text.trim() == '未命名笔记') {
+        _title.text = content;
+      }
     });
-    _scheduleAutoSave();
+    _appendContent(_buildTodoLine(content));
+    ToastUtils.show('已新增待办');
   }
+
+  String _buildTodoLine(String content) => '☐ $content';
 
   void _openAiPanel() {
     _aiPrompt.text = _title.text.trim().isEmpty
@@ -321,6 +321,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           isPinned: _isPinned,
           isTask: _isTask,
           done: _done,
+          doneEnabled: canCompleteTaskContent(_content.text),
           onPinChanged: (value) {
             setState(() => _isPinned = value);
             setSheetState(() {});
@@ -332,6 +333,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
             _scheduleAutoSave();
           },
           onDoneChanged: (value) {
+            if (value && !canCompleteTaskContent(_content.text)) return;
             setState(() => _done = value);
             setSheetState(() {});
             _scheduleAutoSave();
@@ -373,8 +375,8 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
 
   void _openPreview() {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => NotePreviewPage(
+      buildAppPageRoute(
+        child: NotePreviewPage(
           title: _title.text.trim(),
           content: _content.text.trim(),
           priority: _priority,
@@ -383,6 +385,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           isPinned: _isPinned,
           reminderAt: _reminderAt,
         ),
+        axis: AxisDirection.left,
       ),
     );
   }
@@ -410,7 +413,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
     required bool showToast,
   }) async {
     final title = _title.text.trim().isEmpty ? '未命名笔记' : _title.text.trim();
-    final content = _content.text.trim();
+    final content = stripInlineReminderTextFromContent(_content.text).trim();
     if (content.isEmpty) {
       ToastUtils.show('请填写内容');
       return;
@@ -432,7 +435,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         paperColor: _paperColor,
         tag: _tag,
         isTask: _isTask,
-        done: _isTask && _done,
+        done: _isTask && _done && canCompleteTaskContent(content),
         isPinned: _isPinned,
       );
     } else {
@@ -446,7 +449,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           paperColor: _paperColor,
           tag: _tag,
           isTask: _isTask,
-          done: _isTask && _done,
+          done: _isTask && _done && canCompleteTaskContent(content),
           isPinned: _isPinned,
         ),
       );

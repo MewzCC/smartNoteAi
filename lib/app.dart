@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/toast_utils.dart';
 
 class SmartNoteApp extends StatelessWidget {
   const SmartNoteApp({super.key});
@@ -18,6 +19,7 @@ class SmartNoteApp extends StatelessWidget {
         return MaterialApp.router(
           debugShowCheckedModeBanner: false,
           title: 'AI 智能便签',
+          scaffoldMessengerKey: ToastUtils.messengerKey,
           locale: const Locale('zh', 'CN'),
           supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
           localizationsDelegates: const [

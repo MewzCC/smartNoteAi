@@ -9,7 +9,9 @@ import '../../../core/widgets/sticky_tag.dart';
 import '../../../data/models/note_model.dart';
 import '../../../shared/components/app_scaffold.dart';
 import '../../../shared/components/empty_state.dart';
+import '../../../shared/helpers/checklist_helper.dart';
 import '../provider/task_provider.dart';
+import '../widgets/task_create_sheet.dart';
 
 class TaskPage extends ConsumerStatefulWidget {
   const TaskPage({super.key});
@@ -41,7 +43,7 @@ class _TaskPageState extends ConsumerState<TaskPage> {
     return AppScaffold(
       activePath: '/tasks',
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/notes/new?task=1'),
+        onPressed: _openCreateTaskSheet,
         child: const Icon(Icons.add_rounded),
       ),
       child: SafeArea(
@@ -55,7 +57,7 @@ class _TaskPageState extends ConsumerState<TaskPage> {
                 tooltip: '更多',
                 icon: const Icon(Icons.more_horiz_rounded),
                 onSelected: (value) {
-                  if (value == 'new') context.push('/notes/new?task=1');
+                  if (value == 'new') _openCreateTaskSheet();
                   if (value == 'ai') context.push('/ai/task');
                   if (value == 'archive') context.push('/archive');
                 },
@@ -84,6 +86,16 @@ class _TaskPageState extends ConsumerState<TaskPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openCreateTaskSheet() {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const TaskCreateSheet(),
     );
   }
 }
@@ -224,6 +236,7 @@ class _TaskTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final canComplete = canCompleteTaskContent(note.content);
     return Container(
       height: 52,
       margin: const EdgeInsets.only(bottom: 10),
@@ -238,9 +251,15 @@ class _TaskTile extends ConsumerWidget {
         child: Row(
           children: [
             IconButton(
-              tooltip: note.done ? '标记为待办' : '标记为完成',
-              onPressed: () =>
-                  ref.read(smartNoteProvider.notifier).toggleDone(note.id),
+              tooltip: note.done
+                  ? '标记为待办'
+                  : canComplete
+                  ? '标记为完成'
+                  : '完成所有待办后可标记',
+              onPressed: note.done || canComplete
+                  ? () =>
+                        ref.read(smartNoteProvider.notifier).toggleDone(note.id)
+                  : null,
               icon: Icon(
                 note.done
                     ? Icons.check_box_rounded

@@ -13,6 +13,7 @@ class NoteMorePanel extends StatelessWidget {
     required this.onPreview,
     required this.onArchive,
     required this.onDelete,
+    this.doneEnabled = true,
   });
 
   final bool isPinned;
@@ -25,6 +26,7 @@ class NoteMorePanel extends StatelessWidget {
   final VoidCallback onPreview;
   final VoidCallback onArchive;
   final VoidCallback onDelete;
+  final bool doneEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -59,10 +61,10 @@ class NoteMorePanel extends StatelessWidget {
             if (isTask)
               SwitchListTile(
                 value: done,
-                onChanged: onDoneChanged,
+                onChanged: done || doneEnabled ? onDoneChanged : null,
                 secondary: const Icon(Icons.task_alt_rounded),
                 title: const Text('完成状态'),
-                subtitle: const Text('标记已完成或未完成'),
+                subtitle: Text(doneEnabled ? '标记已完成或未完成' : '完成所有待办后可标记'),
               ),
             const Divider(),
             _Action(icon: Icons.copy_rounded, label: '复制内容', onTap: onCopy),

@@ -37,8 +37,8 @@ class NoteToolbar extends StatelessWidget {
               onTap: onAiWrite,
             ),
             _Tool(
-              icon: Icons.check_box_rounded,
-              label: '清单',
+              icon: Icons.add_task_rounded,
+              label: '新增待办',
               onTap: onChecklist,
             ),
             _Tool(icon: Icons.image_rounded, label: '图片', onTap: onImage),

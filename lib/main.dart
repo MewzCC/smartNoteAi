@@ -6,6 +6,6 @@ import 'core/bootstrap/app_bootstrap.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  AppBootstrap.start();
+  await AppBootstrap.ready;
   runApp(const ProviderScope(child: SmartNoteApp()));
 }

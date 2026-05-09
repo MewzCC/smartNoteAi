@@ -10,6 +10,7 @@ import '../../../data/repositories/note_repository.dart';
 import '../../../data/repositories/user_repository.dart';
 import '../../../shared/enums/note_color.dart';
 import '../../../shared/enums/note_priority.dart';
+import '../../../shared/helpers/checklist_helper.dart';
 
 class SmartNoteState {
   const SmartNoteState({
@@ -181,12 +182,20 @@ class SmartNoteController extends Notifier<SmartNoteState> {
     await NotificationService.instance.schedule(note);
   }
 
-  Future<void> toggleDone(String id) async {
+  Future<bool> toggleDone(String id) async {
+    final target = state.notes.where((item) => item.id == id).firstOrNull;
+    if (target == null) return false;
+    final nextDone = !target.done;
+    if (nextDone && !canCompleteTaskContent(target.content)) {
+      return false;
+    }
+
     final next = [
       for (final item in state.notes)
-        if (item.id == id) item.copyWith(done: !item.done) else item,
+        if (item.id == id) item.copyWith(done: nextDone) else item,
     ];
     await _persist(next);
+    return true;
   }
 
   Future<void> toggleArchive(String id) async {
